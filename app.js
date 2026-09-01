@@ -2,7 +2,7 @@ import { ASSETS, drawSprite } from './src/assets.js';
 import {
   addPolygonVertex, analyzeGridResize, changeObjectOrder, copyBlueprintSelection, createHistory, createMapState,
   deleteBlueprintSelection, deletePolygonVertex, deleteSelectedEntity, duplicateBlueprintSelection, getSelectedEntity,
-  moveObject, objectPosition, pasteBlueprintSelection, polygonSelfIntersects, resizeGrid,
+  moveObject, objectPosition, pasteBlueprintSelection, polygonSelfIntersects, resizeGrid, applySerializable, toSerializable,
 } from './src/map-state.js';
 import { MapRenderer } from './src/map-renderer.js';
 import { ToolController } from './src/tools.js';
@@ -14,11 +14,13 @@ import {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const canvas = $('#map');
-const state = createMapState();
+const state = createMapState(undefined, { template: 'empty' });
 const loadedProject = loadProject(state);
 const history = createHistory(state);
 const renderer = new MapRenderer(canvas, state);
 let zoom = loadedProject.zoom || 1;
+let dirty = false;
+if (!loadedProject.loaded) $('#saved').textContent = 'Nouveau';
 
 function notify(message) {
   const toast = $('#toast');
@@ -28,7 +30,7 @@ function notify(message) {
   notify.timeout = setTimeout(() => toast.classList.remove('on'), 1500);
 }
 
-function markDirty() { $('#saved').textContent = 'Modifié'; }
+function markDirty() { dirty = true; $('#saved').textContent = 'Modifié'; }
 
 function updateStats() {
   const count = state.cells.size;
@@ -259,7 +261,7 @@ $('#save').addEventListener('click', () => {
   const validation = saveProject(state, zoom);
   const error = firstValidationMessage(validation);
   if (error) notify(error);
-  else { $('#saved').textContent = 'Sauvegardé'; notify('Projet Pixel Map v1 sauvegardé'); }
+  else { dirty = false; $('#saved').textContent = 'Sauvegardé'; notify('Projet Pixel Map v1 sauvegardé'); }
 });
 $('#export').addEventListener('click', () => {
   renderer.draw({ editorOverlays: false });
@@ -293,6 +295,41 @@ $('#projectFile').addEventListener('change', async (event) => {
   event.target.value = '';
 });
 $('#name').addEventListener('input', (event) => { state.projectName = event.target.value; markDirty(); });
+
+const newProjectDialog = $('#newProjectDialog');
+$('#newProject').addEventListener('click', () => {
+  if (dirty && !window.confirm('Les modifications non sauvegardées seront abandonnées. Continuer ?')) return;
+  $('#newProjectName').value = 'Nouvelle carte';
+  $('#newColumns').value = state.grid.columns;
+  $('#newRows').value = state.grid.rows;
+  $('#newCellWidth').value = state.grid.cellWidth;
+  $('#newCellHeight').value = state.grid.cellHeight;
+  $('#newTemplate').value = 'empty';
+  newProjectDialog.showModal();
+  $('#newProjectName').focus();
+});
+$('#cancelNewProject').addEventListener('click', () => newProjectDialog.close());
+$('#newProjectForm').addEventListener('submit', (event) => {
+  event.preventDefault();
+  try {
+    const name = $('#newProjectName').value.trim();
+    if (!name) throw new Error('Le nom du projet est obligatoire.');
+    const next = createMapState({
+      columns: Number($('#newColumns').value), rows: Number($('#newRows').value),
+      cellWidth: Number($('#newCellWidth').value), cellHeight: Number($('#newCellHeight').value),
+    }, { template: $('#newTemplate').value, projectName: name });
+    applySerializable(state, toSerializable(next));
+    history.clear(); toolController.cancelPolygon();
+    zoom = 1; setZoom(0); $('#name').value = state.projectName;
+    dirty = true; $('#saved').textContent = 'Nouveau';
+    newProjectDialog.close(); renderAssetLibrary(); refresh();
+    notify(`Projet « ${state.projectName} » créé`);
+  } catch (error) { notify(error.message); }
+});
+window.addEventListener('beforeunload', (event) => {
+  if (!dirty) return;
+  event.preventDefault(); event.returnValue = '';
+});
 
 function setZoom(change) {
   zoom = Math.max(0.6, Math.min(1.5, zoom + change));

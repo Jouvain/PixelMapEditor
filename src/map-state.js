@@ -23,11 +23,11 @@ function createInitialCells(grid) {
   return cells;
 }
 
-export function createMapState(grid = DEFAULT_GRID) {
+export function createMapState(grid = DEFAULT_GRID, { template = 'demo', projectName = null } = {}) {
   const normalizedGrid = normalizeGrid(grid);
-  const initialCells = createInitialCells(normalizedGrid);
+  const initialCells = template === 'demo' ? createInitialCells(normalizedGrid) : new Set();
   return {
-    projectName: 'Bureau — Étage 01',
+    projectName: projectName || (template === 'demo' ? 'Bureau — Étage 01' : 'Nouvelle carte'),
     step: 1,
     activeTool: 'room',
     blueprintSelection: new Set(),
@@ -42,8 +42,8 @@ export function createMapState(grid = DEFAULT_GRID) {
     grid: normalizedGrid,
     cells: initialCells,
     collisionCells: new Set(initialCells),
-    doors: [{ x: 3, y: 10, side: 'left' }, { x: 19, y: 8, side: 'right' }]
-      .filter((door) => door.x < normalizedGrid.columns && door.y < normalizedGrid.rows),
+    doors: template === 'demo' ? [{ x: 3, y: 10, side: 'left' }, { x: 19, y: 8, side: 'right' }]
+      .filter((door) => door.x < normalizedGrid.columns && door.y < normalizedGrid.rows) : [],
     objects: [],
     zones: [],
     floor: 'blue',
@@ -475,5 +475,6 @@ export function createHistory(state, limit = 40) {
       applySerializable(state, JSON.parse(previous));
       return true;
     },
+    clear() { entries.length = 0; },
   };
 }

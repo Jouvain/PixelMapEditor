@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  addPolygonVertex, analyzeGridResize, changeObjectOrder, copyBlueprintSelection, createMapState, createPolygonZone,
+  addPolygonVertex, analyzeGridResize, applySerializable, changeObjectOrder, copyBlueprintSelection, createHistory, createMapState, createPolygonZone,
   createRectangleZone, deleteBlueprintSelection, deletePolygonVertex, deleteSelectedEntity, duplicateBlueprintSelection,
   moveBlueprintSelection, moveObject, normalizeGrid, objectPosition, paintCollisionRectangle, paintRectangle,
   pasteBlueprintSelection, placeGenericObject, polygonSelfIntersects, resizeGrid, resizeRectangleZone,
@@ -393,4 +393,30 @@ test('une sélection Blueprint peut être dupliquée, copiée, collée et suppri
   assert.equal(deleteBlueprintSelection(state), true);
   assert.equal(state.cells.has('5,5'), false);
   assert.equal(state.cells.has('1,1'), true);
+});
+
+test('un nouveau projet vide respecte son nom et ses dimensions', () => {
+  const state = createMapState({ columns: 12, rows: 9, cellWidth: 20, cellHeight: 24 }, { template: 'empty', projectName: 'Carte test' });
+  assert.equal(state.projectName, 'Carte test');
+  assert.deepEqual(state.grid, { columns: 12, rows: 9, cellWidth: 20, cellHeight: 24 });
+  assert.equal(state.cells.size, 0);
+  assert.equal(state.collisionCells.size, 0);
+  assert.equal(state.doors.length, 0);
+});
+
+test('le modèle de démonstration reste disponible explicitement', () => {
+  const state = createMapState(undefined, { template: 'demo', projectName: 'Démo' });
+  assert.equal(state.projectName, 'Démo');
+  assert.ok(state.cells.size > 0);
+  assert.ok(state.doors.length > 0);
+});
+
+test('réinitialiser un projet permet de vider son historique', () => {
+  const state = createMapState();
+  const history = createHistory(state);
+  history.checkpoint();
+  applySerializable(state, { ...state, projectName: 'Vide', cells: [], collisionCells: [], doors: [], objects: [], zones: [] });
+  history.clear();
+  assert.equal(history.undo(), false);
+  assert.equal(state.projectName, 'Vide');
 });

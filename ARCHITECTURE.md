@@ -81,3 +81,7 @@ La détection d’auto-intersection est isolée dans `geometry.js`. Elle empêch
 `state.blueprintSelection` contient les clés des cellules graphiques sélectionnées. L’outil Sélection construit cet ensemble par rectangle, puis permet de le déplacer, dupliquer, supprimer, copier et coller. Les portes situées sur les cellules sélectionnées accompagnent les transformations ; les collisions restent volontairement inchangées car elles constituent une couche indépendante.
 
 Le presse-papiers Blueprint est interne au projet en cours et stocke les cellules et portes avec des coordonnées relatives. Un collage crée une nouvelle sélection et reste automatiquement dans les limites de la grille. Les raccourcis disponibles sont Suppr, Ctrl+C, Ctrl+V et Ctrl+D.
+
+## Nouveau projet
+
+Sans sauvegarde locale, l’application démarre sur une carte vide. La commande Nouveau ouvre un dialogue pour choisir le nom, la grille logique et un modèle (`empty` ou `demo`). Elle demande confirmation si l’état courant contient des modifications non sauvegardées, remplace entièrement l’état et vide l’historique afin qu’une annulation ne puisse pas restaurer le projet abandonné.
