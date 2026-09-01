@@ -75,3 +75,9 @@ En mode Sélection, le pointeur déplace l’objet choisi. `objectSnapToGrid` d�
 Une zone sélectionnée se déplace par glissement, en restant dans les limites de la carte. Les rectangles exposent quatre poignées de redimensionnement. Les polygones exposent leurs sommets ; l’inspecteur peut insérer un point au milieu de l’arête sélectionnée — ou de la plus longue arête — et supprimer le point sélectionné tant qu’il en reste au moins trois. Pendant la création, le dernier sommet peut être retiré avec le bouton dédié ou Retour arrière.
 
 La détection d’auto-intersection est isolée dans `geometry.js`. Elle empêche la création et le déplacement invalides et constitue également une erreur de validation Pixel Map v1, afin qu’un polygone croisé importé ne passe pas silencieusement à l’export.
+
+## Sélection Blueprint
+
+`state.blueprintSelection` contient les clés des cellules graphiques sélectionnées. L’outil Sélection construit cet ensemble par rectangle, puis permet de le déplacer, dupliquer, supprimer, copier et coller. Les portes situées sur les cellules sélectionnées accompagnent les transformations ; les collisions restent volontairement inchangées car elles constituent une couche indépendante.
+
+Le presse-papiers Blueprint est interne au projet en cours et stocke les cellules et portes avec des coordonnées relatives. Un collage crée une nouvelle sélection et reste automatiquement dans les limites de la grille. Les raccourcis disponibles sont Suppr, Ctrl+C, Ctrl+V et Ctrl+D.

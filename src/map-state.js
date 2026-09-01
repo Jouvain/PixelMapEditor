@@ -30,6 +30,8 @@ export function createMapState(grid = DEFAULT_GRID) {
     projectName: 'Bureau — Étage 01',
     step: 1,
     activeTool: 'room',
+    blueprintSelection: new Set(),
+    blueprintClipboard: null,
     collisionBrush: 'walkable',
     entityTool: 'asset',
     objectSnapToGrid: true,
@@ -90,6 +92,7 @@ export function resizeGrid(state, grid, allowCrop = false) {
   const outsideCell = (x, y) => x >= analysis.grid.columns || y >= analysis.grid.rows;
   state.cells = new Set([...state.cells].filter((key) => { const [x, y] = key.split(',').map(Number); return !outsideCell(x, y); }));
   state.collisionCells = new Set([...state.collisionCells].filter((key) => { const [x, y] = key.split(',').map(Number); return !outsideCell(x, y); }));
+  state.blueprintSelection = new Set([...state.blueprintSelection].filter((key) => { const [x, y] = key.split(',').map(Number); return !outsideCell(x, y); }));
   state.doors = state.doors.filter((door) => !outsideCell(door.x, door.y));
   state.objects = state.objects.filter((object) => !outsideCell(object.x, object.y));
   if (analysis.losses.zones) {
@@ -132,6 +135,85 @@ export function paintCollisionRectangle(state, start, end, blocked = false) {
       blocked ? state.collisionCells.delete(cellKey(x, y)) : state.collisionCells.add(cellKey(x, y));
     }
   }
+}
+
+export function selectBlueprintRectangle(state, start, end) {
+  const left = Math.min(start.x, end.x), right = Math.max(start.x, end.x);
+  const top = Math.min(start.y, end.y), bottom = Math.max(start.y, end.y);
+  state.blueprintSelection = new Set([...state.cells].filter((key) => {
+    const [x, y] = key.split(',').map(Number);
+    return x >= left && x <= right && y >= top && y <= bottom;
+  }));
+  return state.blueprintSelection.size;
+}
+
+function blueprintSelectionBounds(state) {
+  if (!state.blueprintSelection.size) return null;
+  const points = [...state.blueprintSelection].map((key) => key.split(',').map(Number));
+  return {
+    left: Math.min(...points.map(([x]) => x)), right: Math.max(...points.map(([x]) => x)),
+    top: Math.min(...points.map(([, y]) => y)), bottom: Math.max(...points.map(([, y]) => y)),
+  };
+}
+
+export function moveBlueprintSelection(state, delta, duplicate = false) {
+  const bounds = blueprintSelectionBounds(state);
+  if (!bounds) return false;
+  const dx = Math.max(-bounds.left, Math.min(state.grid.columns - 1 - bounds.right, Math.round(delta.x)));
+  const dy = Math.max(-bounds.top, Math.min(state.grid.rows - 1 - bounds.bottom, Math.round(delta.y)));
+  if (!dx && !dy && !duplicate) return false;
+  const selected = new Set(state.blueprintSelection);
+  const moved = new Set([...selected].map((key) => {
+    const [x, y] = key.split(',').map(Number);
+    return cellKey(x + dx, y + dy);
+  }));
+  if (!duplicate) selected.forEach((key) => state.cells.delete(key));
+  moved.forEach((key) => state.cells.add(key));
+  const selectedDoors = state.doors.filter((door) => selected.has(cellKey(door.x, door.y)));
+  if (!duplicate) state.doors = state.doors.filter((door) => !selected.has(cellKey(door.x, door.y)));
+  state.doors.push(...selectedDoors.map((door) => ({ ...structuredClone(door), id: duplicate ? crypto.randomUUID() : door.id, x: door.x + dx, y: door.y + dy })));
+  state.blueprintSelection = moved;
+  return true;
+}
+
+export function deleteBlueprintSelection(state) {
+  if (!state.blueprintSelection.size) return false;
+  state.blueprintSelection.forEach((key) => state.cells.delete(key));
+  state.doors = state.doors.filter((door) => !state.blueprintSelection.has(cellKey(door.x, door.y)));
+  state.blueprintSelection.clear();
+  return true;
+}
+
+export function copyBlueprintSelection(state) {
+  const bounds = blueprintSelectionBounds(state);
+  if (!bounds) return false;
+  const selected = state.blueprintSelection;
+  state.blueprintClipboard = {
+    width: bounds.right - bounds.left + 1, height: bounds.bottom - bounds.top + 1,
+    cells: [...selected].map((key) => { const [x, y] = key.split(',').map(Number); return { x: x - bounds.left, y: y - bounds.top }; }),
+    doors: state.doors.filter((door) => selected.has(cellKey(door.x, door.y))).map((door) => ({ ...structuredClone(door), id: undefined, x: door.x - bounds.left, y: door.y - bounds.top })),
+  };
+  return true;
+}
+
+export function pasteBlueprintSelection(state, anchor = null) {
+  const clipboard = state.blueprintClipboard;
+  if (!clipboard?.cells.length) return false;
+  const bounds = blueprintSelectionBounds(state);
+  const desired = anchor || { x: (bounds?.left ?? -1) + 1, y: (bounds?.top ?? -1) + 1 };
+  const origin = {
+    x: Math.max(0, Math.min(state.grid.columns - clipboard.width, desired.x)),
+    y: Math.max(0, Math.min(state.grid.rows - clipboard.height, desired.y)),
+  };
+  const pasted = new Set(clipboard.cells.map((point) => cellKey(origin.x + point.x, origin.y + point.y)));
+  pasted.forEach((key) => state.cells.add(key));
+  state.doors.push(...clipboard.doors.map((door) => ({ ...structuredClone(door), id: crypto.randomUUID(), x: origin.x + door.x, y: origin.y + door.y })));
+  state.blueprintSelection = pasted;
+  return true;
+}
+
+export function duplicateBlueprintSelection(state) {
+  return copyBlueprintSelection(state) && pasteBlueprintSelection(state);
 }
 
 export function toggleDoor(state, position) {
@@ -339,7 +421,7 @@ export function deleteSelectedEntity(state) {
 }
 
 export function toSerializable(state) {
-  return { ...state, cells: [...state.cells], collisionCells: [...state.collisionCells] };
+  return { ...state, cells: [...state.cells], collisionCells: [...state.collisionCells], blueprintSelection: [...state.blueprintSelection] };
 }
 
 export function applySerializable(state, data) {
@@ -362,6 +444,7 @@ export function applySerializable(state, data) {
   Object.assign(state, normalized, {
     cells: new Set(data.cells || []),
     collisionCells: new Set(data.collisionCells || data.cells || []),
+    blueprintSelection: new Set(data.blueprintSelection || []),
     doors: data.doors || [],
     objects: data.objects || [],
     zones: data.zones || [],

@@ -1,6 +1,7 @@
 import {
-  createPolygonZone, createRectangleZone, getSelectedEntity, moveObject, objectPosition, paintCollisionRectangle, paintRectangle,
+  createPolygonZone, createRectangleZone, getSelectedEntity, moveBlueprintSelection, moveObject, objectPosition, paintCollisionRectangle, paintRectangle,
   placeGenericObject, placeOrRotateObject, polygonSelfIntersects, resizeRectangleZone, selectEntityAt, toggleDoor, translateZone,
+  selectBlueprintRectangle,
 } from './map-state.js';
 
 export class ToolController {
@@ -13,6 +14,7 @@ export class ToolController {
     this.objectDrag = null;
     this.zoneDrag = null;
     this.rectangleDrag = null;
+    this.blueprintDrag = null;
     canvas.addEventListener('pointerdown', (event) => this.pointerDown(event));
     canvas.addEventListener('pointermove', (event) => this.pointerMove(event));
     canvas.addEventListener('pointerup', (event) => this.pointerUp(event));
@@ -119,7 +121,13 @@ export class ToolController {
       else this.changed();
       return;
     }
-    if (this.state.activeTool === 'select') return;
+    if (this.state.activeTool === 'select') {
+      this.dragging = true; this.start = position;
+      this.blueprintDrag = { mode: this.state.blueprintSelection.has(`${position.x},${position.y}`) ? 'move' : 'select' };
+      this.canvas.setPointerCapture(event.pointerId);
+      this.renderer.setPreview({ start: position, end: position, blueprintSelection: this.blueprintDrag.mode === 'select', blueprintMove: this.blueprintDrag.mode === 'move' });
+      return;
+    }
     this.dragging = true; this.start = position;
     this.canvas.setPointerCapture(event.pointerId);
     this.renderer.setPreview({
@@ -150,6 +158,7 @@ export class ToolController {
     } else if (this.state.step === 2 && this.state.entityTool === 'zone' && this.state.zoneShape === 'polygon' && this.polygonPoints.length) {
       this.renderer.setPreview({ polygon: true, polygonPoints: this.polygonPoints, end: position });
     } else if (this.dragging && this.state.step === 2) this.renderer.setPreview({ start: this.start, end: position, zone: true });
+    else if (this.dragging && this.blueprintDrag) this.renderer.setPreview({ start: this.start, end: position, blueprintSelection: this.blueprintDrag.mode === 'select', blueprintMove: this.blueprintDrag.mode === 'move' });
     else if (this.dragging) this.renderer.setPreview({
       start: this.start, end: position,
       erase: this.state.activeTool === 'erase',
@@ -185,7 +194,11 @@ export class ToolController {
       this.vertexDrag = null; this.renderer.draw(); this.onSelection(); return;
     }
     const end = this.positionFromEvent(event);
-    if (this.state.step === 2 && this.state.entityTool === 'zone') {
+    if (this.blueprintDrag) {
+      if (this.blueprintDrag.mode === 'move') moveBlueprintSelection(this.state, { x: end.x - this.start.x, y: end.y - this.start.y });
+      else selectBlueprintRectangle(this.state, this.start, end);
+      this.blueprintDrag = null;
+    } else if (this.state.step === 2 && this.state.entityTool === 'zone') {
       createRectangleZone(this.state, this.start, end); this.onSelection();
     } else if (this.state.activeTool === 'collision') paintCollisionRectangle(this.state, this.start, end, this.state.collisionBrush === 'blocked');
     else paintRectangle(this.state, this.start, end, this.state.activeTool === 'erase');

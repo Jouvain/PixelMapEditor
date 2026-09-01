@@ -1,7 +1,8 @@
 import { ASSETS, drawSprite } from './src/assets.js';
 import {
-  addPolygonVertex, analyzeGridResize, changeObjectOrder, createHistory, createMapState, deletePolygonVertex, deleteSelectedEntity,
-  getSelectedEntity, moveObject, objectPosition, polygonSelfIntersects, resizeGrid,
+  addPolygonVertex, analyzeGridResize, changeObjectOrder, copyBlueprintSelection, createHistory, createMapState,
+  deleteBlueprintSelection, deletePolygonVertex, deleteSelectedEntity, duplicateBlueprintSelection, getSelectedEntity,
+  moveObject, objectPosition, pasteBlueprintSelection, polygonSelfIntersects, resizeGrid,
 } from './src/map-state.js';
 import { MapRenderer } from './src/map-renderer.js';
 import { ToolController } from './src/tools.js';
@@ -56,6 +57,7 @@ function syncControls() {
   $$('.swatch').forEach((button) => button.classList.toggle('on', button.dataset.color === state.wallColor));
   $$('.floor').forEach((button) => button.classList.toggle('on', button.dataset.floor === state.floor));
   $('#collisionSettings').hidden = state.activeTool !== 'collision';
+  $('#blueprintSelectionSettings').hidden = state.activeTool !== 'select';
   $$('[data-collision]').forEach((button) => button.classList.toggle('on', button.dataset.collision === state.collisionBrush));
   $$('[data-entity-tool]').forEach((button) => button.classList.toggle('on', button.dataset.entityTool === state.entityTool));
   const help = {
@@ -139,6 +141,17 @@ $$('[data-collision]').forEach((button) => button.addEventListener('click', () =
   state.collisionBrush = button.dataset.collision;
   syncControls(); renderer.draw();
 }));
+function changeBlueprintSelection(action, message) {
+  history.checkpoint();
+  if (!action()) { notify('Aucune surface sélectionnée.'); return false; }
+  markDirty(); updateStats(); renderer.draw(); notify(message); return true;
+}
+$('#duplicateBlueprint').addEventListener('click', () => changeBlueprintSelection(() => duplicateBlueprintSelection(state), 'Sélection dupliquée'));
+$('#deleteBlueprint').addEventListener('click', () => changeBlueprintSelection(() => deleteBlueprintSelection(state), 'Sélection supprimée'));
+$('#copyBlueprint').addEventListener('click', () => {
+  if (copyBlueprintSelection(state)) notify('Sélection copiée'); else notify('Aucune surface sélectionnée.');
+});
+$('#pasteBlueprint').addEventListener('click', () => changeBlueprintSelection(() => pasteBlueprintSelection(state), 'Sélection collée'));
 $$('[data-entity-tool]').forEach((button) => button.addEventListener('click', () => {
   if (state.entityTool === 'zone' && button.dataset.entityTool !== 'zone') toolController.cancelPolygon();
   state.entityTool = button.dataset.entityTool;
@@ -294,6 +307,13 @@ document.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') { event.preventDefault(); toolController.finishPolygon(); return; }
     if (event.key === 'Escape') { event.preventDefault(); toolController.cancelPolygon(); return; }
     if (event.key === 'Backspace' && !/input|textarea/i.test(event.target.tagName)) { event.preventDefault(); toolController.undoPolygonPoint(); return; }
+  }
+  const editingField = /input|textarea/i.test(event.target.tagName);
+  if (state.step === 1 && state.activeTool === 'select' && !editingField) {
+    if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); $('#deleteBlueprint').click(); return; }
+    if (event.ctrlKey && event.key.toLowerCase() === 'c') { event.preventDefault(); $('#copyBlueprint').click(); return; }
+    if (event.ctrlKey && event.key.toLowerCase() === 'v') { event.preventDefault(); $('#pasteBlueprint').click(); return; }
+    if (event.ctrlKey && event.key.toLowerCase() === 'd') { event.preventDefault(); $('#duplicateBlueprint').click(); return; }
   }
   if (event.ctrlKey && event.key.toLowerCase() === 'z') $('#undo').click();
   const shortcuts = { r: 'room', e: 'erase', d: 'door', v: 'select', c: 'collision' };

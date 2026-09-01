@@ -26,6 +26,7 @@ export class MapRenderer {
     if (state.showGrid) this.drawGrid();
     this.drawWalls();
     this.drawDoors();
+    if (editorOverlays && state.step === 1 && state.activeTool === 'select') this.drawBlueprintSelection();
     if (state.step === 2) {
       if (editorOverlays) this.drawZones();
       this.drawObjects(editorOverlays);
@@ -121,6 +122,19 @@ export class MapRenderer {
     });
   }
 
+  drawBlueprintSelection(offset = { x: 0, y: 0 }, alpha = 1) {
+    const { cellWidth, cellHeight } = this.state.grid;
+    this.context.save(); this.context.globalAlpha = alpha;
+    this.context.fillStyle = 'rgba(214, 106, 50, 0.25)'; this.context.strokeStyle = '#d66a32'; this.context.lineWidth = 2;
+    this.context.setLineDash([5, 3]);
+    this.state.blueprintSelection.forEach((key) => {
+      const [x, y] = key.split(',').map(Number);
+      this.context.fillRect((x + offset.x) * cellWidth, (y + offset.y) * cellHeight, cellWidth, cellHeight);
+      this.context.strokeRect((x + offset.x) * cellWidth + 1, (y + offset.y) * cellHeight + 1, cellWidth - 2, cellHeight - 2);
+    });
+    this.context.restore();
+  }
+
   drawObjects(editorOverlays = true) {
     const { cellWidth, cellHeight } = this.state.grid;
     const scale = 0.58 * Math.min(cellWidth, cellHeight) / 32;
@@ -178,7 +192,7 @@ export class MapRenderer {
   }
 
   drawPreview() {
-    const { start, end, erase, collision, blocked, zone } = this.preview;
+    const { start, end, erase, collision, blocked, zone, blueprintSelection, blueprintMove } = this.preview;
     const { cellWidth, cellHeight } = this.state.grid;
     if (this.preview.polygon) {
       const points = [...this.preview.polygonPoints, this.preview.end];
@@ -198,11 +212,15 @@ export class MapRenderer {
       });
       return;
     }
+    if (blueprintMove) {
+      this.drawBlueprintSelection({ x: end.x - start.x, y: end.y - start.y }, 0.75);
+      return;
+    }
     const x = Math.min(start.x, end.x), y = Math.min(start.y, end.y);
     const width = Math.abs(start.x - end.x) + 1, height = Math.abs(start.y - end.y) + 1;
-    this.context.fillStyle = zone ? 'rgba(91, 84, 196, 0.28)' : (collision ? (blocked ? 'rgba(180, 38, 32, 0.7)' : 'rgba(40, 190, 85, 0.7)') : (erase ? '#bd392a44' : '#d66a3244'));
+    this.context.fillStyle = blueprintSelection ? 'rgba(214, 106, 50, 0.22)' : (zone ? 'rgba(91, 84, 196, 0.28)' : (collision ? (blocked ? 'rgba(180, 38, 32, 0.7)' : 'rgba(40, 190, 85, 0.7)') : (erase ? '#bd392a44' : '#d66a3244')));
     this.context.fillRect(x * cellWidth, y * cellHeight, width * cellWidth, height * cellHeight);
-    this.context.strokeStyle = zone ? '#5b54c4' : (collision ? (blocked ? '#8f1f1b' : '#18743a') : '#d66a32'); this.context.lineWidth = 2;
+    this.context.strokeStyle = blueprintSelection ? '#d66a32' : (zone ? '#5b54c4' : (collision ? (blocked ? '#8f1f1b' : '#18743a') : '#d66a32')); this.context.lineWidth = 2;
     this.context.strokeRect(x * cellWidth, y * cellHeight, width * cellWidth, height * cellHeight);
   }
 }

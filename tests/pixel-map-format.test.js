@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  addPolygonVertex, analyzeGridResize, changeObjectOrder, createMapState, createPolygonZone, createRectangleZone, deletePolygonVertex, deleteSelectedEntity,
-  moveObject, normalizeGrid, objectPosition, paintCollisionRectangle, paintRectangle, placeGenericObject, polygonSelfIntersects,
-  resizeGrid, resizeRectangleZone, selectEntityAt, translateZone,
+  addPolygonVertex, analyzeGridResize, changeObjectOrder, copyBlueprintSelection, createMapState, createPolygonZone,
+  createRectangleZone, deleteBlueprintSelection, deletePolygonVertex, deleteSelectedEntity, duplicateBlueprintSelection,
+  moveBlueprintSelection, moveObject, normalizeGrid, objectPosition, paintCollisionRectangle, paintRectangle,
+  pasteBlueprintSelection, placeGenericObject, polygonSelfIntersects, resizeGrid, resizeRectangleZone,
+  selectBlueprintRectangle, selectEntityAt, translateZone,
 } from '../src/map-state.js';
 import { projectToState, stateToDocument, stateToProject } from '../src/project-adapter.js';
 import { validatePixelMap, validatePixelMapProject } from '../src/pixel-map-format.js';
@@ -356,4 +358,39 @@ test('les polygones auto-intersectés sont détectés à la création et à la v
   const validation = validatePixelMap(document);
   assert.equal(validation.valid, false);
   assert.ok(validation.issues.some((item) => item.code === 'self-intersecting-polygon'));
+});
+
+test('la sélection Blueprint ne retient que les cellules graphiques du rectangle', () => {
+  const state = createMapState({ columns: 8, rows: 8, cellWidth: 16, cellHeight: 16 });
+  state.cells = new Set(['1,1', '2,1', '5,5']);
+  assert.equal(selectBlueprintRectangle(state, { x: 0, y: 0 }, { x: 3, y: 3 }), 2);
+  assert.deepEqual([...state.blueprintSelection].sort(), ['1,1', '2,1']);
+});
+
+test('déplacer une sélection déplace ses portes mais pas ses collisions', () => {
+  const state = createMapState({ columns: 8, rows: 8, cellWidth: 16, cellHeight: 16 });
+  state.cells = new Set(['1,1', '2,1']);
+  state.collisionCells = new Set(['1,1', '2,1']);
+  state.doors = [{ id: 'door-a', x: 1, y: 1, side: 'top' }];
+  selectBlueprintRectangle(state, { x: 1, y: 1 }, { x: 2, y: 1 });
+  assert.equal(moveBlueprintSelection(state, { x: 2, y: 3 }), true);
+  assert.deepEqual([...state.cells].sort(), ['3,4', '4,4']);
+  assert.deepEqual([...state.collisionCells].sort(), ['1,1', '2,1']);
+  assert.deepEqual({ x: state.doors[0].x, y: state.doors[0].y }, { x: 3, y: 4 });
+});
+
+test('une sélection Blueprint peut être dupliquée, copiée, collée et supprimée', () => {
+  const state = createMapState({ columns: 8, rows: 8, cellWidth: 16, cellHeight: 16 });
+  state.cells = new Set(['1,1', '2,1']);
+  selectBlueprintRectangle(state, { x: 1, y: 1 }, { x: 2, y: 1 });
+  assert.equal(duplicateBlueprintSelection(state), true);
+  assert.ok(state.cells.has('2,2'));
+  assert.ok(state.cells.has('3,2'));
+  assert.equal(copyBlueprintSelection(state), true);
+  assert.equal(pasteBlueprintSelection(state, { x: 5, y: 5 }), true);
+  assert.ok(state.cells.has('5,5'));
+  assert.ok(state.cells.has('6,5'));
+  assert.equal(deleteBlueprintSelection(state), true);
+  assert.equal(state.cells.has('5,5'), false);
+  assert.equal(state.cells.has('1,1'), true);
 });
