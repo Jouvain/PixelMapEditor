@@ -1,3 +1,6 @@
+import { polygonSelfIntersects } from './geometry.js';
+export { polygonSelfIntersects } from './geometry.js';
+
 export const DEFAULT_GRID = Object.freeze({ columns: 36, rows: 24, cellWidth: 32, cellHeight: 32 });
 export const GRID_LIMITS = Object.freeze({ maxColumns: 512, maxRows: 512, maxCellSize: 256, maxCanvasSize: 8192 });
 
@@ -32,6 +35,7 @@ export function createMapState(grid = DEFAULT_GRID) {
     objectSnapToGrid: true,
     zoneShape: 'rectangle',
     selectedEntity: null,
+    selectedZoneVertex: null,
     selectedAsset: 'desk',
     grid: normalizedGrid,
     cells: initialCells,
@@ -182,16 +186,73 @@ export function createRectangleZone(state, start, end) {
 export function createPolygonZone(state, gridPoints) {
   if (gridPoints.length < 3) throw new Error('Un polygone nécessite au moins trois sommets.');
   const { cellWidth, cellHeight } = state.grid;
+  const points = gridPoints.map((point) => ({ x: (point.x + 0.5) * cellWidth, y: (point.y + 0.5) * cellHeight }));
+  if (polygonSelfIntersects(points)) throw new Error('Le polygone ne peut pas s’auto-intersecter.');
   const zone = {
     id: crypto.randomUUID(), type: 'zone.generic', name: 'Nouvelle zone', properties: {},
     shape: {
       type: 'polygon',
-      points: gridPoints.map((point) => ({ x: (point.x + 0.5) * cellWidth, y: (point.y + 0.5) * cellHeight })),
+      points,
     },
   };
   state.zones.push(zone);
   state.selectedEntity = { kind: 'zone', id: zone.id };
   return zone;
+}
+
+export function translateZone(state, zone, delta, sourceShape = zone.shape) {
+  const width = state.grid.columns * state.grid.cellWidth, height = state.grid.rows * state.grid.cellHeight;
+  const points = sourceShape.type === 'rectangle'
+    ? [{ x: sourceShape.x, y: sourceShape.y }, { x: sourceShape.x + sourceShape.width, y: sourceShape.y + sourceShape.height }]
+    : sourceShape.points;
+  const minX = Math.min(...points.map((point) => point.x)), maxX = Math.max(...points.map((point) => point.x));
+  const minY = Math.min(...points.map((point) => point.y)), maxY = Math.max(...points.map((point) => point.y));
+  const dx = Math.max(-minX, Math.min(width - maxX, delta.x));
+  const dy = Math.max(-minY, Math.min(height - maxY, delta.y));
+  zone.shape = sourceShape.type === 'rectangle'
+    ? { ...structuredClone(sourceShape), x: sourceShape.x + dx, y: sourceShape.y + dy }
+    : { ...structuredClone(sourceShape), points: sourceShape.points.map((point) => ({ x: point.x + dx, y: point.y + dy })) };
+  return zone;
+}
+
+export function resizeRectangleZone(state, zone, handle, position) {
+  if (zone.shape.type !== 'rectangle') return false;
+  const maximumX = state.grid.columns * state.grid.cellWidth, maximumY = state.grid.rows * state.grid.cellHeight;
+  const left = zone.shape.x, top = zone.shape.y, right = left + zone.shape.width, bottom = top + zone.shape.height;
+  const x = Math.max(0, Math.min(maximumX, position.x)), y = Math.max(0, Math.min(maximumY, position.y));
+  const nextLeft = handle.includes('w') ? Math.min(x, right - 1) : left;
+  const nextRight = handle.includes('e') ? Math.max(x, left + 1) : right;
+  const nextTop = handle.includes('n') ? Math.min(y, bottom - 1) : top;
+  const nextBottom = handle.includes('s') ? Math.max(y, top + 1) : bottom;
+  Object.assign(zone.shape, { x: nextLeft, y: nextTop, width: nextRight - nextLeft, height: nextBottom - nextTop });
+  return true;
+}
+
+export function addPolygonVertex(zone, afterIndex = null) {
+  if (zone.shape.type !== 'polygon') return -1;
+  const points = zone.shape.points;
+  let index = afterIndex;
+  if (!Number.isInteger(index) || index < 0 || index >= points.length) {
+    let longest = -1;
+    points.forEach((point, candidate) => {
+      const next = points[(candidate + 1) % points.length];
+      const length = (next.x - point.x) ** 2 + (next.y - point.y) ** 2;
+      if (length > longest) { longest = length; index = candidate; }
+    });
+  }
+  const a = points[index], b = points[(index + 1) % points.length];
+  points.splice(index + 1, 0, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  return index + 1;
+}
+
+export function deletePolygonVertex(zone, index) {
+  if (zone.shape.type !== 'polygon' || zone.shape.points.length <= 3 || !Number.isInteger(index)) return false;
+  const [removed] = zone.shape.points.splice(index, 1);
+  if (polygonSelfIntersects(zone.shape.points)) {
+    zone.shape.points.splice(index, 0, removed);
+    return false;
+  }
+  return true;
 }
 
 export function pointInPolygon(point, points) {
@@ -291,6 +352,7 @@ export function applySerializable(state, data) {
     objectSnapToGrid: data.objectSnapToGrid ?? state.objectSnapToGrid,
     zoneShape: data.zoneShape ?? state.zoneShape,
     selectedEntity: data.selectedEntity ?? null,
+    selectedZoneVertex: data.selectedZoneVertex ?? null,
     selectedAsset: data.selectedAsset ?? state.selectedAsset,
     wallColor: data.wallColor ?? data.wall ?? state.wallColor,
     wallWidth: data.wallWidth ?? data.width ?? state.wallWidth,

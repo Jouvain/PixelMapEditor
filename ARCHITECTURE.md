@@ -69,3 +69,9 @@ Les anciennes URI internes `asset://objects/...` et `asset://floors/...` du cata
 Un objet conserve `x` et `y` comme index de case pour les opérations de grille, ainsi que `pixelX` et `pixelY` comme position logique exacte de son centre. L’adaptateur Pixel Map utilise toujours la position exacte. Les anciens états qui ne possèdent que les index de case sont complétés automatiquement.
 
 En mode Sélection, le pointeur déplace l’objet choisi. `objectSnapToGrid` détermine si le centre est aimanté sur une case ou suit librement le pointeur. L’ordre de `state.objects` constitue l’ordre d’affichage : le dernier objet est au premier plan. Quand plusieurs objets occupent le même emplacement, des sélections successives les parcourent du premier plan vers l’arrière-plan.
+
+## Édition géométrique des zones
+
+Une zone sélectionnée se déplace par glissement, en restant dans les limites de la carte. Les rectangles exposent quatre poignées de redimensionnement. Les polygones exposent leurs sommets ; l’inspecteur peut insérer un point au milieu de l’arête sélectionnée — ou de la plus longue arête — et supprimer le point sélectionné tant qu’il en reste au moins trois. Pendant la création, le dernier sommet peut être retiré avec le bouton dédié ou Retour arrière.
+
+La détection d’auto-intersection est isolée dans `geometry.js`. Elle empêche la création et le déplacement invalides et constitue également une erreur de validation Pixel Map v1, afin qu’un polygone croisé importé ne passe pas silencieusement à l’export.

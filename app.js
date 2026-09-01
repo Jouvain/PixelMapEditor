@@ -1,7 +1,7 @@
 import { ASSETS, drawSprite } from './src/assets.js';
 import {
-  analyzeGridResize, changeObjectOrder, createHistory, createMapState, deleteSelectedEntity,
-  getSelectedEntity, moveObject, objectPosition, resizeGrid,
+  addPolygonVertex, analyzeGridResize, changeObjectOrder, createHistory, createMapState, deletePolygonVertex, deleteSelectedEntity,
+  getSelectedEntity, moveObject, objectPosition, polygonSelfIntersects, resizeGrid,
 } from './src/map-state.js';
 import { MapRenderer } from './src/map-renderer.js';
 import { ToolController } from './src/tools.js';
@@ -91,6 +91,10 @@ function renderInspector() {
   $('#entityProperties').value = JSON.stringify(entity.properties || {}, null, 2);
   const isObject = state.selectedEntity.kind === 'object';
   $('#objectPosition').hidden = !isObject;
+  const isPolygon = state.selectedEntity.kind === 'zone' && entity.shape.type === 'polygon';
+  $('#zoneGeometry').hidden = state.selectedEntity.kind !== 'zone';
+  $('#addZoneVertex').hidden = !isPolygon;
+  $('#deleteZoneVertex').hidden = !isPolygon;
   if (isObject) {
     const position = objectPosition(state, entity);
     $('#entityX').value = Number(position.x.toFixed(3));
@@ -145,7 +149,23 @@ $$('[data-zone-shape]').forEach((button) => button.addEventListener('click', () 
   syncControls(); renderer.draw();
 }));
 $('#finishPolygon').addEventListener('click', () => toolController.finishPolygon());
+$('#undoPolygonPoint').addEventListener('click', () => toolController.undoPolygonPoint());
 $('#cancelPolygon').addEventListener('click', () => toolController.cancelPolygon());
+$('#addZoneVertex').addEventListener('click', () => {
+  const zone = getSelectedEntity(state);
+  if (!zone || zone.shape.type !== 'polygon') return;
+  history.checkpoint();
+  state.selectedZoneVertex = addPolygonVertex(zone, state.selectedZoneVertex);
+  markDirty(); renderer.draw(); renderInspector();
+});
+$('#deleteZoneVertex').addEventListener('click', () => {
+  const zone = getSelectedEntity(state);
+  if (!zone || zone.shape.type !== 'polygon') return;
+  history.checkpoint();
+  if (!deletePolygonVertex(zone, state.selectedZoneVertex)) { notify('Sélectionnez un sommet ; trois sommets minimum.'); return; }
+  state.selectedZoneVertex = null;
+  markDirty(); renderer.draw(); renderInspector();
+});
 $('#applyEntity').addEventListener('click', () => {
   const entity = getSelectedEntity(state);
   if (!entity) return;
@@ -161,6 +181,7 @@ $('#applyEntity').addEventListener('click', () => {
       if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error('La position doit contenir deux nombres.');
       moveObject(state, entity, { x, y }, false);
     }
+    if (state.selectedEntity.kind === 'zone' && entity.shape.type === 'polygon' && polygonSelfIntersects(entity.shape.points)) throw new Error('Le polygone s’auto-intersecte.');
     markDirty(); renderer.draw(); renderInspector(); notify('Entité mise à jour');
   } catch (error) { notify(`Propriétés invalides : ${error.message}`); }
 });
@@ -272,6 +293,7 @@ document.addEventListener('keydown', (event) => {
   if (state.step === 2 && state.entityTool === 'zone' && state.zoneShape === 'polygon') {
     if (event.key === 'Enter') { event.preventDefault(); toolController.finishPolygon(); return; }
     if (event.key === 'Escape') { event.preventDefault(); toolController.cancelPolygon(); return; }
+    if (event.key === 'Backspace' && !/input|textarea/i.test(event.target.tagName)) { event.preventDefault(); toolController.undoPolygonPoint(); return; }
   }
   if (event.ctrlKey && event.key.toLowerCase() === 'z') $('#undo').click();
   const shortcuts = { r: 'room', e: 'erase', d: 'door', v: 'select', c: 'collision' };

@@ -1,6 +1,6 @@
 import {
   createPolygonZone, createRectangleZone, getSelectedEntity, moveObject, objectPosition, paintCollisionRectangle, paintRectangle,
-  placeGenericObject, placeOrRotateObject, selectEntityAt, toggleDoor,
+  placeGenericObject, placeOrRotateObject, polygonSelfIntersects, resizeRectangleZone, selectEntityAt, toggleDoor, translateZone,
 } from './map-state.js';
 
 export class ToolController {
@@ -11,6 +11,8 @@ export class ToolController {
     this.polygonPoints = [];
     this.vertexDrag = null;
     this.objectDrag = null;
+    this.zoneDrag = null;
+    this.rectangleDrag = null;
     canvas.addEventListener('pointerdown', (event) => this.pointerDown(event));
     canvas.addEventListener('pointermove', (event) => this.pointerMove(event));
     canvas.addEventListener('pointerup', (event) => this.pointerUp(event));
@@ -26,14 +28,23 @@ export class ToolController {
     return { x: (position.x + 0.5) * this.state.grid.cellWidth, y: (position.y + 0.5) * this.state.grid.cellHeight };
   }
 
-  selectedPolygonVertex(position) {
+  selectedPolygonVertex(logical) {
     const entity = getSelectedEntity(this.state);
     if (this.state.selectedEntity?.kind !== 'zone' || entity?.shape.type !== 'polygon') return null;
-    const logical = this.logicalCenter(position);
+    const tolerance = Math.max(6, Math.min(this.state.grid.cellWidth, this.state.grid.cellHeight) / 3);
     const index = entity.shape.points.findIndex((point) =>
-      Math.abs(point.x - logical.x) <= this.state.grid.cellWidth / 2
-      && Math.abs(point.y - logical.y) <= this.state.grid.cellHeight / 2);
+      Math.abs(point.x - logical.x) <= tolerance && Math.abs(point.y - logical.y) <= tolerance);
     return index < 0 ? null : { zone: entity, index };
+  }
+
+  selectedRectangleHandle(logical) {
+    const zone = getSelectedEntity(this.state);
+    if (this.state.selectedEntity?.kind !== 'zone' || zone?.shape.type !== 'rectangle') return null;
+    const { x, y, width, height } = zone.shape;
+    const tolerance = Math.max(7, Math.min(this.state.grid.cellWidth, this.state.grid.cellHeight) / 3);
+    const handles = { nw: { x, y }, ne: { x: x + width, y }, se: { x: x + width, y: y + height }, sw: { x, y: y + height } };
+    const handle = Object.entries(handles).find(([, point]) => Math.abs(point.x - logical.x) <= tolerance && Math.abs(point.y - logical.y) <= tolerance);
+    return handle ? { zone, handle: handle[0] } : null;
   }
 
   positionFromEvent(event) {
@@ -55,6 +66,7 @@ export class ToolController {
 
   pointerDown(event) {
     const position = this.positionFromEvent(event);
+    const logical = this.logicalPositionFromEvent(event);
     this.history.checkpoint();
     if (this.state.step === 2) {
       if (this.state.entityTool === 'asset') {
@@ -63,17 +75,26 @@ export class ToolController {
       } else if (this.state.entityTool === 'object') {
         placeGenericObject(this.state, position); this.changed(); this.onSelection();
       } else if (this.state.entityTool === 'select') {
-        const vertex = this.selectedPolygonVertex(position);
+        const vertex = this.selectedPolygonVertex(logical);
+        const rectangle = this.selectedRectangleHandle(logical);
         if (vertex) {
-          this.vertexDrag = vertex; this.dragging = true;
+          this.state.selectedZoneVertex = vertex.index;
+          this.vertexDrag = { ...vertex, originalPoint: structuredClone(vertex.zone.shape.points[vertex.index]), moved: false }; this.dragging = true;
+          this.canvas.setPointerCapture(event.pointerId);
+          this.renderer.draw(); this.onSelection();
+        } else if (rectangle) {
+          this.rectangleDrag = { ...rectangle, moved: false }; this.dragging = true;
           this.canvas.setPointerCapture(event.pointerId);
         } else {
-          const logical = this.logicalPositionFromEvent(event);
           selectEntityAt(this.state, position, logical);
           const entity = getSelectedEntity(this.state);
           if (this.state.selectedEntity?.kind === 'object' && entity) {
             const center = objectPosition(this.state, entity);
             this.objectDrag = { object: entity, offsetX: center.x - logical.x, offsetY: center.y - logical.y, moved: false };
+            this.dragging = true; this.canvas.setPointerCapture(event.pointerId);
+          } else if (this.state.selectedEntity?.kind === 'zone' && entity) {
+            this.state.selectedZoneVertex = null;
+            this.zoneDrag = { zone: entity, start: logical, sourceShape: structuredClone(entity.shape), moved: false };
             this.dragging = true; this.canvas.setPointerCapture(event.pointerId);
           }
           this.renderer.draw(); this.onSelection();
@@ -113,8 +134,15 @@ export class ToolController {
     const position = this.positionFromEvent(event);
     this.onPosition(position);
     if (this.vertexDrag) {
-      this.vertexDrag.zone.shape.points[this.vertexDrag.index] = this.logicalCenter(position);
-      this.renderer.draw();
+      this.vertexDrag.zone.shape.points[this.vertexDrag.index] = this.logicalPositionFromEvent(event);
+      this.vertexDrag.moved = true; this.renderer.draw(); this.onSelection();
+    } else if (this.rectangleDrag) {
+      resizeRectangleZone(this.state, this.rectangleDrag.zone, this.rectangleDrag.handle, this.logicalPositionFromEvent(event));
+      this.rectangleDrag.moved = true; this.renderer.draw(); this.onSelection();
+    } else if (this.zoneDrag) {
+      const logical = this.logicalPositionFromEvent(event);
+      translateZone(this.state, this.zoneDrag.zone, { x: logical.x - this.zoneDrag.start.x, y: logical.y - this.zoneDrag.start.y }, this.zoneDrag.sourceShape);
+      this.zoneDrag.moved = true; this.renderer.draw(); this.onSelection();
     } else if (this.objectDrag) {
       const logical = this.logicalPositionFromEvent(event);
       moveObject(this.state, this.objectDrag.object, { x: logical.x + this.objectDrag.offsetX, y: logical.y + this.objectDrag.offsetY });
@@ -133,6 +161,14 @@ export class ToolController {
   pointerUp(event) {
     if (!this.dragging) return;
     this.dragging = false;
+    if (this.rectangleDrag) {
+      const moved = this.rectangleDrag.moved; this.rectangleDrag = null;
+      if (moved) this.changed(); this.onSelection(); return;
+    }
+    if (this.zoneDrag) {
+      const moved = this.zoneDrag.moved; this.zoneDrag = null;
+      if (moved) this.changed(); this.onSelection(); return;
+    }
     if (this.objectDrag) {
       const moved = this.objectDrag.moved;
       this.objectDrag = null;
@@ -140,8 +176,13 @@ export class ToolController {
       this.onSelection(); return;
     }
     if (this.vertexDrag) {
-      this.vertexDrag.zone.shape.points[this.vertexDrag.index] = this.logicalCenter(this.positionFromEvent(event));
-      this.vertexDrag = null; this.changed(); this.onSelection(); return;
+      const drag = this.vertexDrag;
+      drag.zone.shape.points[drag.index] = this.logicalPositionFromEvent(event);
+      if (polygonSelfIntersects(drag.zone.shape.points)) {
+        drag.zone.shape.points[drag.index] = drag.originalPoint;
+        this.notify('Déplacement refusé : le polygone s’auto-intersecterait.');
+      } else if (drag.moved) this.changed();
+      this.vertexDrag = null; this.renderer.draw(); this.onSelection(); return;
     }
     const end = this.positionFromEvent(event);
     if (this.state.step === 2 && this.state.entityTool === 'zone') {
@@ -154,7 +195,8 @@ export class ToolController {
 
   finishPolygon() {
     if (this.polygonPoints.length < 3) { this.notify('Ajoutez au moins trois sommets.'); return false; }
-    createPolygonZone(this.state, this.polygonPoints);
+    try { createPolygonZone(this.state, this.polygonPoints); }
+    catch (error) { this.notify(error.message); return false; }
     this.polygonPoints = [];
     this.renderer.clearPreview(); this.changed(); this.onSelection();
     return true;
@@ -163,6 +205,14 @@ export class ToolController {
   cancelPolygon() {
     this.polygonPoints = [];
     this.renderer.clearPreview(); this.renderer.draw();
+  }
+
+  undoPolygonPoint() {
+    if (!this.polygonPoints.length) return false;
+    this.polygonPoints.pop();
+    if (this.polygonPoints.length) this.renderer.setPreview({ polygon: true, polygonPoints: this.polygonPoints, end: this.polygonPoints.at(-1) });
+    else { this.renderer.clearPreview(); this.renderer.draw(); }
+    return true;
   }
 
   changed() { this.onChange(); this.renderer.draw(); }

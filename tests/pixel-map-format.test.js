@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  analyzeGridResize, changeObjectOrder, createMapState, createPolygonZone, createRectangleZone, deleteSelectedEntity,
-  moveObject, normalizeGrid, objectPosition, paintCollisionRectangle, paintRectangle, placeGenericObject, resizeGrid, selectEntityAt,
+  addPolygonVertex, analyzeGridResize, changeObjectOrder, createMapState, createPolygonZone, createRectangleZone, deletePolygonVertex, deleteSelectedEntity,
+  moveObject, normalizeGrid, objectPosition, paintCollisionRectangle, paintRectangle, placeGenericObject, polygonSelfIntersects,
+  resizeGrid, resizeRectangleZone, selectEntityAt, translateZone,
 } from '../src/map-state.js';
 import { projectToState, stateToDocument, stateToProject } from '../src/project-adapter.js';
 import { validatePixelMap, validatePixelMapProject } from '../src/pixel-map-format.js';
@@ -313,4 +314,46 @@ test('les objets superposés sont parcourus et leur ordre peut changer', () => {
   assert.equal(changeObjectOrder(state, back, 'front'), true);
   state.selectedEntity = null;
   assert.equal(selectEntityAt(state, { x: 4, y: 4 }).id, back.id);
+});
+
+test('une zone entière peut être déplacée sans sortir de la carte', () => {
+  const state = createMapState({ columns: 10, rows: 10, cellWidth: 20, cellHeight: 20 });
+  const rectangle = createRectangleZone(state, { x: 1, y: 1 }, { x: 2, y: 2 });
+  translateZone(state, rectangle, { x: 30, y: 40 });
+  assert.deepEqual(rectangle.shape, { type: 'rectangle', x: 50, y: 60, width: 40, height: 40 });
+  translateZone(state, rectangle, { x: 999, y: 999 });
+  assert.equal(rectangle.shape.x + rectangle.shape.width, 200);
+  assert.equal(rectangle.shape.y + rectangle.shape.height, 200);
+});
+
+test('un rectangle se redimensionne depuis ses quatre coins', () => {
+  const state = createMapState({ columns: 10, rows: 10, cellWidth: 20, cellHeight: 20 });
+  const zone = createRectangleZone(state, { x: 2, y: 2 }, { x: 4, y: 4 });
+  resizeRectangleZone(state, zone, 'nw', { x: 20, y: 30 });
+  assert.deepEqual(zone.shape, { type: 'rectangle', x: 20, y: 30, width: 80, height: 70 });
+  resizeRectangleZone(state, zone, 'se', { x: 150, y: 160 });
+  assert.deepEqual(zone.shape, { type: 'rectangle', x: 20, y: 30, width: 130, height: 130 });
+});
+
+test('un sommet polygonal peut être ajouté puis supprimé sans passer sous trois sommets', () => {
+  const state = createMapState();
+  const zone = createPolygonZone(state, [{ x: 1, y: 1 }, { x: 5, y: 1 }, { x: 3, y: 5 }]);
+  const index = addPolygonVertex(zone, 0);
+  assert.equal(zone.shape.points.length, 4);
+  assert.deepEqual(zone.shape.points[index], { x: 112, y: 48 });
+  assert.equal(deletePolygonVertex(zone, index), true);
+  assert.equal(zone.shape.points.length, 3);
+  assert.equal(deletePolygonVertex(zone, 0), false);
+});
+
+test('les polygones auto-intersectés sont détectés à la création et à la validation', () => {
+  const crossing = [{ x: 10, y: 10 }, { x: 90, y: 90 }, { x: 10, y: 90 }, { x: 90, y: 10 }];
+  assert.equal(polygonSelfIntersects(crossing), true);
+  const state = createMapState({ columns: 10, rows: 10, cellWidth: 20, cellHeight: 20 });
+  assert.throws(() => createPolygonZone(state, [{ x: 0, y: 0 }, { x: 4, y: 4 }, { x: 0, y: 4 }, { x: 4, y: 0 }]), /auto-intersecter/);
+  const document = stateToDocument(state);
+  document.zones.push({ id: 'crossing', type: 'zone.test', shape: { type: 'polygon', points: crossing }, properties: {} });
+  const validation = validatePixelMap(document);
+  assert.equal(validation.valid, false);
+  assert.ok(validation.issues.some((item) => item.code === 'self-intersecting-polygon'));
 });

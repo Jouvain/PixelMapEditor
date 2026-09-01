@@ -1,4 +1,5 @@
 import { isPortableImageSource } from './portable-assets.js';
+import { polygonSelfIntersects } from './geometry.js';
 
 export const PIXEL_MAP_FORMAT = 'pixel-map';
 export const PIXEL_MAP_PROJECT_FORMAT = 'pixel-map-project';
@@ -145,6 +146,7 @@ export function validatePixelMap(document) {
     if (!zone.type || typeof zone.type !== 'string') issues.push(issue('error', `${base}.type`, 'missing-type', 'Un type de zone est obligatoire.'));
     if (!isObject(zone.shape) || !['rectangle', 'polygon'].includes(zone.shape.type)) issues.push(issue('error', `${base}.shape`, 'invalid-shape', 'Forme de zone inconnue.'));
     else if (zone.shape.type === 'polygon' && (!Array.isArray(zone.shape.points) || zone.shape.points.length < 3)) issues.push(issue('error', `${base}.shape.points`, 'invalid-polygon', 'Un polygone doit posséder au moins trois points.'));
+    else if (zone.shape.type === 'polygon' && polygonSelfIntersects(zone.shape.points)) issues.push(issue('error', `${base}.shape.points`, 'self-intersecting-polygon', 'Le polygone ne doit pas s’auto-intersecter.'));
     else if (zone.shape.type === 'rectangle' && (!inBounds(zone.shape.x, map.width) || !inBounds(zone.shape.y, map.height) || zone.shape.width <= 0 || zone.shape.height <= 0 || zone.shape.x + zone.shape.width > map.width || zone.shape.y + zone.shape.height > map.height)) issues.push(issue('warning', `${base}.shape`, 'zone-out-of-bounds', 'La zone dépasse les limites de la carte.'));
     else if (zone.shape.type === 'polygon' && zone.shape.points.some((point) => !inBounds(point.x, map.width) || !inBounds(point.y, map.height))) issues.push(issue('warning', `${base}.shape.points`, 'zone-out-of-bounds', 'La zone dépasse les limites de la carte.'));
     validateProperties(zone.properties ?? {}, `${base}.properties`, issues);

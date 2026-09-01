@@ -1,4 +1,4 @@
-import { hasCell, objectPosition } from './map-state.js';
+import { hasCell, objectPosition, polygonSelfIntersects } from './map-state.js';
 import { drawSprite } from './assets.js';
 
 export class MapRenderer {
@@ -161,9 +161,17 @@ export class MapRenderer {
       const labelPoint = shape.type === 'rectangle' ? shape : shape.points[0];
       this.context.fillText(zone.name || zone.type, labelPoint.x + 5, labelPoint.y + 14);
       if (selected && shape.type === 'polygon') {
-        shape.points.forEach((point) => {
-          this.context.fillStyle = '#fff'; this.context.strokeStyle = '#e88e2f'; this.context.lineWidth = 2;
+        const invalid = polygonSelfIntersects(shape.points);
+        shape.points.forEach((point, index) => {
+          this.context.fillStyle = this.state.selectedZoneVertex === index ? '#e88e2f' : '#fff';
+          this.context.strokeStyle = invalid ? '#c92f2f' : '#e88e2f'; this.context.lineWidth = 2;
           this.context.beginPath(); this.context.arc(point.x, point.y, 5, 0, Math.PI * 2); this.context.fill(); this.context.stroke();
+        });
+      } else if (selected && shape.type === 'rectangle') {
+        const handles = [{ x: shape.x, y: shape.y }, { x: shape.x + shape.width, y: shape.y }, { x: shape.x + shape.width, y: shape.y + shape.height }, { x: shape.x, y: shape.y + shape.height }];
+        handles.forEach((point) => {
+          this.context.fillStyle = '#fff'; this.context.strokeStyle = '#e88e2f'; this.context.lineWidth = 2;
+          this.context.fillRect(point.x - 5, point.y - 5, 10, 10); this.context.strokeRect(point.x - 5, point.y - 5, 10, 10);
         });
       }
     });
