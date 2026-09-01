@@ -19,19 +19,6 @@ function mergeResource(existing, generated) {
   return { ...existing, ...generated, source, properties: clone(existing.properties ?? generated.properties) };
 }
 
-function objectsInOriginalOrder(originalObjects, editedObjects) {
-  const remaining = new Map(editedObjects.map((object) => [object.id, object]));
-  const result = [];
-  originalObjects.forEach((object) => {
-    const edited = remaining.get(object.id);
-    if (!edited) return;
-    result.push(edited);
-    remaining.delete(object.id);
-  });
-  result.push(...remaining.values());
-  return result;
-}
-
 export function stateToDocument(state) {
   const { columns, rows, cellWidth, cellHeight } = state.grid;
   const blank = createPixelMapDocument({
@@ -100,7 +87,7 @@ export function stateToDocument(state) {
     const exported = {
       ...existing, id,
       type: object.type.startsWith('furniture.') || !assetId ? object.type : `furniture.${object.type}`,
-      position: { x: (object.x + 0.5) * cellWidth, y: (object.y + 0.5) * cellHeight },
+      position: { x: object.pixelX ?? (object.x + 0.5) * cellWidth, y: object.pixelY ?? (object.y + 0.5) * cellHeight },
       size: existing.size || { width: cellWidth, height: cellHeight }, rotation: (object.rotation || 0) * 90,
       layer: existing.layer || 'decoration', properties: clone(object.properties || {}),
     };
@@ -119,7 +106,7 @@ export function stateToDocument(state) {
       properties: { ...(existing.properties || {}), ...(door.properties || {}), gridX: door.x, gridY: door.y, side: door.side },
     };
   });
-  document.objects = objectsInOriginalOrder(originalObjects, [...exportedObjects, ...exportedDoors]);
+  document.objects = [...exportedObjects, ...exportedDoors];
   document.zones = (state.zones || []).map(clone);
   document.properties = { ...(document.properties || {}), wall: { ...(document.properties?.wall || {}), color: state.wallColor, width: state.wallWidth } };
   return document;
@@ -130,7 +117,7 @@ export function stateToProject(state, zoom = 1) {
     activeStep: state.step === 1 ? 'blueprint' : 'decoration', activeTool: state.activeTool,
     selectedLayer: state.step === 1 ? 'floor' : 'decoration', selectedAsset: state.selectedAsset,
     zoom, showGrid: state.showGrid,
-    properties: { collisionBrush: state.collisionBrush, entityTool: state.entityTool, zoneShape: state.zoneShape },
+    properties: { collisionBrush: state.collisionBrush, entityTool: state.entityTool, zoneShape: state.zoneShape, objectSnapToGrid: state.objectSnapToGrid },
   });
   if (!state.sourceProject) return generated;
   const source = clone(state.sourceProject);
@@ -162,6 +149,7 @@ export function projectToState(project, state) {
     assetId: object.resource?.startsWith('asset.') ? object.resource.slice('asset.'.length) : null,
     properties: clone(object.properties || {}),
     x: Math.floor(object.position.x / grid.cellWidth), y: Math.floor(object.position.y / grid.cellHeight),
+    pixelX: object.position.x, pixelY: object.position.y,
     rotation: Math.round((object.rotation || 0) / 90) % 4,
   }));
   const floorResource = floorLayer?.tiles?.[0]?.resource || 'floor.blue';
@@ -169,6 +157,7 @@ export function projectToState(project, state) {
     projectName: document.name, grid, step: editor.activeStep === 'blueprint' ? 1 : 2,
     activeTool: editor.activeTool, collisionBrush: editor.properties?.collisionBrush,
     entityTool: editor.properties?.entityTool, zoneShape: editor.properties?.zoneShape,
+    objectSnapToGrid: editor.properties?.objectSnapToGrid,
     selectedAsset: editor.selectedAsset, cells, collisionCells: [...collisionCells], doors, objects,
     zones: clone(document.zones), floor: floorResource.replace('floor.', ''),
     wallColor: document.properties?.wall?.color, wallWidth: document.properties?.wall?.width,

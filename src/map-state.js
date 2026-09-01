@@ -29,6 +29,7 @@ export function createMapState(grid = DEFAULT_GRID) {
     activeTool: 'room',
     collisionBrush: 'walkable',
     entityTool: 'asset',
+    objectSnapToGrid: true,
     zoneShape: 'rectangle',
     selectedEntity: null,
     selectedAsset: 'desk',
@@ -149,14 +150,14 @@ export function placeOrRotateObject(state, position) {
   const object = state.objects.find((item) =>
     Math.abs(item.x - position.x) < 2 && Math.abs(item.y - position.y) < 2);
   if (object) object.rotation = ((object.rotation || 0) + 1) % 4;
-  else state.objects.push({ id: crypto.randomUUID(), type: `furniture.${state.selectedAsset}`, assetId: state.selectedAsset, name: '', properties: {}, ...position, rotation: 0 });
+  else state.objects.push({ id: crypto.randomUUID(), type: `furniture.${state.selectedAsset}`, assetId: state.selectedAsset, name: '', properties: {}, ...position, pixelX: (position.x + 0.5) * state.grid.cellWidth, pixelY: (position.y + 0.5) * state.grid.cellHeight, rotation: 0 });
   const selected = object || state.objects.at(-1);
   state.selectedEntity = { kind: 'object', id: selected.id };
   return true;
 }
 
 export function placeGenericObject(state, position) {
-  const object = { id: crypto.randomUUID(), type: 'object.generic', assetId: null, name: 'Nouvel objet', properties: {}, ...position, rotation: 0 };
+  const object = { id: crypto.randomUUID(), type: 'object.generic', assetId: null, name: 'Nouvel objet', properties: {}, ...position, pixelX: (position.x + 0.5) * state.grid.cellWidth, pixelY: (position.y + 0.5) * state.grid.cellHeight, rotation: 0 };
   state.objects.push(object);
   state.selectedEntity = { kind: 'object', id: object.id };
   return object;
@@ -210,11 +211,52 @@ export function getSelectedEntity(state) {
   return collection.find((item) => item.id === state.selectedEntity.id) || null;
 }
 
-export function selectEntityAt(state, position) {
-  const object = [...state.objects].reverse().find((item) => item.x === position.x && item.y === position.y);
-  if (object) return (state.selectedEntity = { kind: 'object', id: object.id });
-  const logicalX = (position.x + 0.5) * state.grid.cellWidth;
-  const logicalY = (position.y + 0.5) * state.grid.cellHeight;
+export function objectPosition(state, object) {
+  return {
+    x: object.pixelX ?? (object.x + 0.5) * state.grid.cellWidth,
+    y: object.pixelY ?? (object.y + 0.5) * state.grid.cellHeight,
+  };
+}
+
+export function moveObject(state, object, position, snapToGrid = state.objectSnapToGrid) {
+  const { cellWidth, cellHeight, columns, rows } = state.grid;
+  const maximumX = columns * cellWidth, maximumY = rows * cellHeight;
+  let x = Math.max(0, Math.min(maximumX, position.x));
+  let y = Math.max(0, Math.min(maximumY, position.y));
+  if (snapToGrid) {
+    x = (Math.max(0, Math.min(columns - 1, Math.floor(x / cellWidth))) + 0.5) * cellWidth;
+    y = (Math.max(0, Math.min(rows - 1, Math.floor(y / cellHeight))) + 0.5) * cellHeight;
+  }
+  object.pixelX = x; object.pixelY = y;
+  object.x = Math.max(0, Math.min(columns - 1, Math.floor(x / cellWidth)));
+  object.y = Math.max(0, Math.min(rows - 1, Math.floor(y / cellHeight)));
+  return object;
+}
+
+export function changeObjectOrder(state, object, direction) {
+  const index = state.objects.indexOf(object);
+  if (index < 0) return false;
+  const target = direction === 'front' ? state.objects.length - 1 : 0;
+  if (index === target) return false;
+  state.objects.splice(index, 1);
+  state.objects.splice(target, 0, object);
+  return true;
+}
+
+export function selectEntityAt(state, position, logicalPosition = null) {
+  const logical = logicalPosition || { x: (position.x + 0.5) * state.grid.cellWidth, y: (position.y + 0.5) * state.grid.cellHeight };
+  const halfWidth = state.grid.cellWidth / 2, halfHeight = state.grid.cellHeight / 2;
+  const hits = [...state.objects].reverse().filter((item) => {
+    const center = objectPosition(state, item);
+    return Math.abs(center.x - logical.x) <= halfWidth && Math.abs(center.y - logical.y) <= halfHeight;
+  });
+  if (hits.length) {
+    const selectedIndex = hits.findIndex((item) => state.selectedEntity?.kind === 'object' && state.selectedEntity.id === item.id);
+    const object = hits[(selectedIndex + 1) % hits.length];
+    return (state.selectedEntity = { kind: 'object', id: object.id });
+  }
+  const logicalX = logical.x;
+  const logicalY = logical.y;
   const zone = [...state.zones].reverse().find((item) => {
     const shape = item.shape;
     if (shape.type === 'rectangle') return logicalX >= shape.x && logicalX <= shape.x + shape.width && logicalY >= shape.y && logicalY <= shape.y + shape.height;
@@ -246,6 +288,7 @@ export function applySerializable(state, data) {
     activeTool: data.activeTool ?? state.activeTool,
     collisionBrush: data.collisionBrush ?? state.collisionBrush,
     entityTool: data.entityTool ?? state.entityTool,
+    objectSnapToGrid: data.objectSnapToGrid ?? state.objectSnapToGrid,
     zoneShape: data.zoneShape ?? state.zoneShape,
     selectedEntity: data.selectedEntity ?? null,
     selectedAsset: data.selectedAsset ?? state.selectedAsset,
@@ -269,6 +312,8 @@ export function applySerializable(state, data) {
     object.name ??= '';
     object.properties ??= {};
     object.rotation ??= object.r || 0;
+    object.pixelX ??= (object.x + 0.5) * state.grid.cellWidth;
+    object.pixelY ??= (object.y + 0.5) * state.grid.cellHeight;
   });
 }
 

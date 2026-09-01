@@ -1,7 +1,7 @@
 import { ASSETS, drawSprite } from './src/assets.js';
 import {
-  analyzeGridResize, createHistory, createMapState, deleteSelectedEntity,
-  getSelectedEntity, resizeGrid,
+  analyzeGridResize, changeObjectOrder, createHistory, createMapState, deleteSelectedEntity,
+  getSelectedEntity, moveObject, objectPosition, resizeGrid,
 } from './src/map-state.js';
 import { MapRenderer } from './src/map-renderer.js';
 import { ToolController } from './src/tools.js';
@@ -89,6 +89,14 @@ function renderInspector() {
   $('#entityType').value = entity.type;
   $('#entityName').value = entity.name || '';
   $('#entityProperties').value = JSON.stringify(entity.properties || {}, null, 2);
+  const isObject = state.selectedEntity.kind === 'object';
+  $('#objectPosition').hidden = !isObject;
+  if (isObject) {
+    const position = objectPosition(state, entity);
+    $('#entityX').value = Number(position.x.toFixed(3));
+    $('#entityY').value = Number(position.y.toFixed(3));
+    $('#objectSnap').checked = state.objectSnapToGrid;
+  }
 }
 
 function renderAssetLibrary() {
@@ -148,9 +156,23 @@ $('#applyEntity').addEventListener('click', () => {
     if (!properties || Array.isArray(properties) || typeof properties !== 'object') throw new Error('Les propriétés doivent être un objet JSON.');
     history.checkpoint();
     entity.type = type; entity.name = $('#entityName').value.trim(); entity.properties = properties;
+    if (state.selectedEntity.kind === 'object') {
+      const x = Number($('#entityX').value), y = Number($('#entityY').value);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error('La position doit contenir deux nombres.');
+      moveObject(state, entity, { x, y }, false);
+    }
     markDirty(); renderer.draw(); renderInspector(); notify('Entité mise à jour');
   } catch (error) { notify(`Propriétés invalides : ${error.message}`); }
 });
+$('#objectSnap').addEventListener('change', (event) => { state.objectSnapToGrid = event.target.checked; markDirty(); });
+function reorderSelectedObject(direction) {
+  const entity = getSelectedEntity(state);
+  if (!entity || state.selectedEntity.kind !== 'object') return;
+  history.checkpoint();
+  if (changeObjectOrder(state, entity, direction)) { markDirty(); renderer.draw(); notify(direction === 'front' ? 'Objet placé au premier plan' : 'Objet placé à l’arrière-plan'); }
+}
+$('#bringForward').addEventListener('click', () => reorderSelectedObject('front'));
+$('#sendBackward').addEventListener('click', () => reorderSelectedObject('back'));
 $('#deleteEntity').addEventListener('click', () => {
   if (!getSelectedEntity(state)) return;
   history.checkpoint(); deleteSelectedEntity(state);

@@ -170,3 +170,21 @@
 }
 #finishPolygon { color: #287442; }
 #cancelPolygon { color: #a52f28; }
+.position-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.position-grid label { margin-top: 0; }
+#objectPosition > label {
+  flex-direction: row;
+  align-items: center;
+  font-weight: 400;
+}
+#objectPosition > label input { width: auto; }
+#objectPosition > small {
+  display: block;
+  color: #777;
+  font-size: 8px;
+  line-height: 1.4;
+}

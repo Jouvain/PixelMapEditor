@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  analyzeGridResize, createMapState, createPolygonZone, createRectangleZone, deleteSelectedEntity,
-  normalizeGrid, paintCollisionRectangle, paintRectangle, placeGenericObject, resizeGrid, selectEntityAt,
+  analyzeGridResize, changeObjectOrder, createMapState, createPolygonZone, createRectangleZone, deleteSelectedEntity,
+  moveObject, normalizeGrid, objectPosition, paintCollisionRectangle, paintRectangle, placeGenericObject, resizeGrid, selectEntityAt,
 } from '../src/map-state.js';
 import { projectToState, stateToDocument, stateToProject } from '../src/project-adapter.js';
 import { validatePixelMap, validatePixelMapProject } from '../src/pixel-map-format.js';
@@ -281,4 +281,36 @@ test('une collision defaultBlocked false conserve sa sémantique après aller-re
   assert.deepEqual(exported.document.collision.cells.find((cell) => cell.x === 1 && cell.y === 1).properties, { material: 'stone' });
   assert.equal(exported.document.collision.cells.filter((cell) => !cell.blocked).length, 11);
   assert.equal(validatePixelMapProject(exported).valid, true);
+});
+
+test('un objet se déplace librement ou avec alignement sur la grille', () => {
+  const state = createMapState({ columns: 10, rows: 8, cellWidth: 32, cellHeight: 24 });
+  const object = placeGenericObject(state, { x: 2, y: 3 });
+  moveObject(state, object, { x: 77.5, y: 51.25 }, false);
+  assert.deepEqual(objectPosition(state, object), { x: 77.5, y: 51.25 });
+  moveObject(state, object, { x: 77.5, y: 51.25 }, true);
+  assert.deepEqual(objectPosition(state, object), { x: 80, y: 60 });
+});
+
+test('la position libre précise fait un aller-retour Pixel Map', () => {
+  const source = createMapState();
+  const object = placeGenericObject(source, { x: 2, y: 3 });
+  moveObject(source, object, { x: 91.25, y: 117.75 }, false);
+  const project = stateToProject(source);
+  assert.deepEqual(project.document.objects.find((item) => item.id === object.id).position, { x: 91.25, y: 117.75 });
+  const destination = createMapState();
+  projectToState(project, destination);
+  assert.deepEqual(objectPosition(destination, destination.objects.find((item) => item.id === object.id)), { x: 91.25, y: 117.75 });
+});
+
+test('les objets superposés sont parcourus et leur ordre peut changer', () => {
+  const state = createMapState();
+  const back = placeGenericObject(state, { x: 4, y: 4 });
+  const front = placeGenericObject(state, { x: 4, y: 4 });
+  state.selectedEntity = null;
+  assert.equal(selectEntityAt(state, { x: 4, y: 4 }).id, front.id);
+  assert.equal(selectEntityAt(state, { x: 4, y: 4 }).id, back.id);
+  assert.equal(changeObjectOrder(state, back, 'front'), true);
+  state.selectedEntity = null;
+  assert.equal(selectEntityAt(state, { x: 4, y: 4 }).id, back.id);
 });

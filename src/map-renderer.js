@@ -1,4 +1,4 @@
-import { hasCell } from './map-state.js';
+import { hasCell, objectPosition } from './map-state.js';
 import { drawSprite } from './assets.js';
 
 export class MapRenderer {
@@ -125,7 +125,7 @@ export class MapRenderer {
     const { cellWidth, cellHeight } = this.state.grid;
     const scale = 0.58 * Math.min(cellWidth, cellHeight) / 32;
     this.state.objects.forEach((object) => {
-      const centerX = (object.x + 0.5) * cellWidth, centerY = (object.y + 0.5) * cellHeight;
+      const { x: centerX, y: centerY } = objectPosition(this.state, object);
       if (object.assetId) drawSprite(this.context, object.assetId, centerX, centerY, scale, object.rotation);
       else if (editorOverlays) {
         this.context.fillStyle = '#7248a8'; this.context.strokeStyle = '#fff'; this.context.lineWidth = 2;
@@ -133,7 +133,7 @@ export class MapRenderer {
       }
       if (editorOverlays && this.state.selectedEntity?.kind === 'object' && this.state.selectedEntity.id === object.id) {
         this.context.strokeStyle = '#ffb35f'; this.context.lineWidth = 3;
-        this.context.strokeRect(object.x * cellWidth + 2, object.y * cellHeight + 2, cellWidth - 4, cellHeight - 4);
+        this.context.strokeRect(centerX - cellWidth / 2 + 2, centerY - cellHeight / 2 + 2, cellWidth - 4, cellHeight - 4);
       }
     });
   }

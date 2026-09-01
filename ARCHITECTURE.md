@@ -63,3 +63,9 @@ Les zones peuvent être rectangulaires ou polygonales. Un polygone est construit
 Les ressources produites par l’éditeur sont embarquées directement dans le JSON sous forme d’URI `data:image/svg+xml`. Un consommateur Pixel Map n’a donc besoin ni du catalogue de PixelMapEditor, ni d’un résolveur propriétaire. Le format accepte aussi une URL HTTPS ou un chemin relatif vers un fichier image, afin de permettre à un autre producteur de distribuer un JSON accompagné de ses images.
 
 Les anciennes URI internes `asset://objects/...` et `asset://floors/...` du catalogue connu sont converties à l’import. Toute autre URI `asset://` est rejetée par la validation, puisqu’elle ne peut pas être résolue de manière indépendante.
+
+## Position et profondeur des objets
+
+Un objet conserve `x` et `y` comme index de case pour les opérations de grille, ainsi que `pixelX` et `pixelY` comme position logique exacte de son centre. L’adaptateur Pixel Map utilise toujours la position exacte. Les anciens états qui ne possèdent que les index de case sont complétés automatiquement.
+
+En mode Sélection, le pointeur déplace l’objet choisi. `objectSnapToGrid` détermine si le centre est aimanté sur une case ou suit librement le pointeur. L’ordre de `state.objects` constitue l’ordre d’affichage : le dernier objet est au premier plan. Quand plusieurs objets occupent le même emplacement, des sélections successives les parcourent du premier plan vers l’arrière-plan.
