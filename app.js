@@ -1,17 +1,20 @@
 import { ASSETS, drawSprite } from './src/assets.js';
-import { createHistory, createMapState } from './src/map-state.js';
+import { analyzeGridResize, createHistory, createMapState, resizeGrid } from './src/map-state.js';
 import { MapRenderer } from './src/map-renderer.js';
 import { ToolController } from './src/tools.js';
-import { exportPng, loadProject, saveProject } from './src/export.js';
+import {
+  exportPixelMap, exportPng, exportProject, firstValidationMessage,
+  importProjectFile, loadProject, saveProject,
+} from './src/export.js';
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const canvas = $('#map');
 const state = createMapState();
-loadProject(state);
+const loadedProject = loadProject(state);
 const history = createHistory(state);
 const renderer = new MapRenderer(canvas, state);
-let zoom = 1;
+let zoom = loadedProject.zoom || 1;
 
 function notify(message) {
   const toast = $('#toast');
@@ -51,6 +54,11 @@ function syncControls() {
   $('#width').value = state.wallWidth;
   $('#widthOut').textContent = `${state.wallWidth} px`;
   $('#grid').checked = state.showGrid;
+  $('#gridColumns').value = state.grid.columns;
+  $('#gridRows').value = state.grid.rows;
+  $('#cellWidth').value = state.grid.cellWidth;
+  $('#cellHeight').value = state.grid.cellHeight;
+  $('#mapResolution').textContent = `${state.grid.columns * state.grid.cellWidth} × ${state.grid.rows * state.grid.cellHeight}`;
 }
 
 function refresh() { updateStep(); updateStats(); syncControls(); renderer.draw(); }
@@ -108,13 +116,58 @@ $('#width').addEventListener('input', (event) => {
   markDirty(); renderer.draw();
 });
 $('#grid').addEventListener('change', (event) => { state.showGrid = event.target.checked; renderer.draw(); });
+$('#applyDimensions').addEventListener('click', () => {
+  try {
+    const nextGrid = {
+      columns: Number($('#gridColumns').value), rows: Number($('#gridRows').value),
+      cellWidth: Number($('#cellWidth').value), cellHeight: Number($('#cellHeight').value),
+    };
+    const analysis = analyzeGridResize(state, nextGrid);
+    if (analysis.totalLosses) {
+      const { cells, doors, objects, zones } = analysis.losses;
+      if (!window.confirm(`Réduire la carte supprimera ${cells} case(s), ${doors} porte(s), ${objects} objet(s) et ${zones} zone(s). Continuer ?`)) { syncControls(); return; }
+    }
+    history.checkpoint();
+    resizeGrid(state, nextGrid, true);
+    markDirty(); refresh();
+    notify(`Grille ${state.grid.columns} × ${state.grid.rows}, cases ${state.grid.cellWidth} × ${state.grid.cellHeight}`);
+  } catch (error) { notify(error.message); syncControls(); }
+});
 $('#next').addEventListener('click', () => { state.step = state.step === 1 ? 2 : 1; refresh(); });
 $('#undo').addEventListener('click', () => { if (history.undo()) { markDirty(); refresh(); } });
 $('#save').addEventListener('click', () => {
   state.projectName = $('#name').value;
-  saveProject(state); $('#saved').textContent = 'Sauvegardé'; notify('Projet sauvegardé localement');
+  const validation = saveProject(state, zoom);
+  const error = firstValidationMessage(validation);
+  if (error) notify(error);
+  else { $('#saved').textContent = 'Sauvegardé'; notify('Projet Pixel Map v1 sauvegardé'); }
 });
 $('#export').addEventListener('click', () => { exportPng(canvas, $('#name').value); notify('Export PNG généré'); });
+$('#exportJson').addEventListener('click', () => {
+  state.projectName = $('#name').value;
+  const error = firstValidationMessage(exportPixelMap(state));
+  notify(error || 'Export Pixel Map v1 généré');
+});
+$('#exportProject').addEventListener('click', () => {
+  state.projectName = $('#name').value;
+  const error = firstValidationMessage(exportProject(state, zoom));
+  notify(error || 'Fichier projet généré');
+});
+$('#importProject').addEventListener('click', () => $('#projectFile').click());
+$('#projectFile').addEventListener('change', async (event) => {
+  const [file] = event.target.files;
+  if (!file) return;
+  try {
+    const result = await importProjectFile(file, state);
+    const error = firstValidationMessage(result.validation);
+    if (error) notify(error);
+    else {
+      zoom = result.zoom; setZoom(0); $('#name').value = state.projectName;
+      renderAssetLibrary(); refresh(); markDirty(); notify('Projet Pixel Map v1 importé');
+    }
+  } catch (error) { notify(error.message); }
+  event.target.value = '';
+});
 $('#name').addEventListener('input', (event) => { state.projectName = event.target.value; markDirty(); });
 
 function setZoom(change) {
@@ -135,4 +188,5 @@ $('#name').value = state.projectName;
 $('#width').value = state.wallWidth;
 $('#grid').checked = state.showGrid;
 renderAssetLibrary();
+setZoom(0);
 refresh();

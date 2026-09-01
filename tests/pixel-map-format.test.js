@@ -1,0 +1,96 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { analyzeGridResize, createMapState, normalizeGrid, resizeGrid } from '../src/map-state.js';
+import { projectToState, stateToDocument, stateToProject } from '../src/project-adapter.js';
+import { validatePixelMap, validatePixelMapProject } from '../src/pixel-map-format.js';
+
+test('l’état actuel produit un document Pixel Map v1 valide', () => {
+  const document = stateToDocument(createMapState());
+  const validation = validatePixelMap(document);
+  assert.equal(validation.valid, true, JSON.stringify(validation.issues));
+  assert.equal(document.format, 'pixel-map');
+  assert.equal(document.version, '1.0');
+  assert.equal(document.map.width, document.grid.columns * document.grid.cellWidth);
+  assert.equal(document.collision.defaultBlocked, true);
+});
+
+test('le projet sépare les données portables de l’état de l’éditeur', () => {
+  const project = stateToProject(createMapState(), 1.2);
+  assert.equal(validatePixelMapProject(project).valid, true);
+  assert.equal(project.format, 'pixel-map-project');
+  assert.equal(project.document.editor, undefined);
+  assert.equal(project.editor.zoom, 1.2);
+});
+
+test('une dimension incohérente interdit l’export', () => {
+  const document = stateToDocument(createMapState());
+  document.map.width += 1;
+  const validation = validatePixelMap(document);
+  assert.equal(validation.valid, false);
+  assert.ok(validation.issues.some((item) => item.code === 'grid-width-mismatch'));
+});
+
+test('une référence de ressource inconnue interdit l’export', () => {
+  const document = stateToDocument(createMapState());
+  document.layers[0].tiles[0].resource = 'missing';
+  const validation = validatePixelMap(document);
+  assert.equal(validation.valid, false);
+  assert.ok(validation.issues.some((item) => item.code === 'unknown-resource'));
+});
+
+test('un projet exporté peut reconstruire l’état de l’éditeur', () => {
+  const source = createMapState();
+  source.floor = 'wood';
+  source.objects.push({ id: 'desk-1', type: 'desk', x: 5, y: 6, rotation: 1 });
+  const project = stateToProject(source, 0.8);
+  const destination = createMapState();
+  const zoom = projectToState(project, destination);
+  assert.equal(destination.floor, 'wood');
+  assert.equal(destination.objects[0].id, 'desk-1');
+  assert.equal(destination.objects[0].rotation, 1);
+  assert.equal(zoom, 0.8);
+});
+
+test('une propriété non JSON interdit l’export', () => {
+  const document = stateToDocument(createMapState());
+  document.properties.invalid = () => 'code exécutable';
+  const validation = validatePixelMap(document);
+  assert.equal(validation.valid, false);
+  assert.ok(validation.issues.some((item) => item.code === 'non-json-properties'));
+});
+
+test('une grille dynamique avec cases rectangulaires fait un aller-retour', () => {
+  const source = createMapState({ columns: 10, rows: 8, cellWidth: 16, cellHeight: 24 });
+  const document = stateToDocument(source);
+  assert.equal(validatePixelMap(document).valid, true);
+  assert.deepEqual(document.grid, { columns: 10, rows: 8, cellWidth: 16, cellHeight: 24 });
+  assert.deepEqual(document.map, { width: 160, height: 192, background: '#f8f7f2' });
+  const destination = createMapState();
+  projectToState(stateToProject(source), destination);
+  assert.deepEqual(destination.grid, source.grid);
+});
+
+test('agrandir une grille conserve son contenu', () => {
+  const state = createMapState({ columns: 10, rows: 8, cellWidth: 16, cellHeight: 16 });
+  const before = state.cells.size;
+  const result = resizeGrid(state, { columns: 20, rows: 12, cellWidth: 16, cellHeight: 16 });
+  assert.equal(result.resized, true);
+  assert.equal(state.cells.size, before);
+});
+
+test('réduire une grille annonce les pertes avant de rogner', () => {
+  const state = createMapState();
+  state.objects.push({ id: 'outside', type: 'desk', x: 30, y: 20, rotation: 0 });
+  const next = { columns: 10, rows: 8, cellWidth: 32, cellHeight: 32 };
+  const analysis = analyzeGridResize(state, next);
+  assert.ok(analysis.totalLosses > 0);
+  assert.equal(resizeGrid(state, next).resized, false);
+  assert.equal(state.grid.columns, 36);
+  assert.equal(resizeGrid(state, next, true).resized, true);
+  assert.equal(state.grid.columns, 10);
+  assert.equal(state.objects.some((object) => object.id === 'outside'), false);
+});
+
+test('les dimensions dépassant la capacité du canvas sont refusées', () => {
+  assert.throws(() => normalizeGrid({ columns: 512, rows: 10, cellWidth: 32, cellHeight: 32 }), /canvas est limité/);
+});

@@ -1,4 +1,4 @@
-import { GRID, paintRectangle, placeOrRotateObject, toggleDoor } from './map-state.js';
+import { paintRectangle, placeOrRotateObject, toggleDoor } from './map-state.js';
 
 export class ToolController {
   constructor({ canvas, state, renderer, history, onChange, onPosition, notify }) {
@@ -13,9 +13,10 @@ export class ToolController {
 
   positionFromEvent(event) {
     const bounds = this.canvas.getBoundingClientRect();
+    const { columns, rows, cellWidth, cellHeight } = this.state.grid;
     return {
-      x: Math.max(0, Math.min(GRID.columns - 1, Math.floor((event.clientX - bounds.left) * this.canvas.width / bounds.width / GRID.tileSize))),
-      y: Math.max(0, Math.min(GRID.rows - 1, Math.floor((event.clientY - bounds.top) * this.canvas.height / bounds.height / GRID.tileSize))),
+      x: Math.max(0, Math.min(columns - 1, Math.floor((event.clientX - bounds.left) * this.canvas.width / bounds.width / cellWidth))),
+      y: Math.max(0, Math.min(rows - 1, Math.floor((event.clientY - bounds.top) * this.canvas.height / bounds.height / cellHeight))),
     };
   }
 

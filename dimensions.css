@@ -1,0 +1,33 @@
+.dimension-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.dimension-grid label {
+  display: flex !important;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 !important;
+  color: #666;
+}
+.dimension-grid input {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #d4d2cb;
+  background: #fff;
+}
+.resolution {
+  margin: 9px 0;
+  color: #777;
+  font-size: 9px;
+}
+.apply-dimensions {
+  width: 100%;
+  margin-bottom: 2px;
+  padding: 8px;
+  border: 1px solid #c7a17a;
+  background: #f4e8dc;
+  color: #87421f;
+  font-size: 9px;
+  font-weight: 700;
+}

@@ -16,6 +16,10 @@ Entrées utilisateur → tools.js → map-state.js → map-renderer.js
 - `src/tools.js` : transforme les clics et glissements en actions métier.
 - `src/export.js` : sauvegarde, recharge et exporte le projet.
 - `src/assets.js` : catalogue et dessin des meubles pixel art.
+- `src/pixel-map-format.js` : construit et valide les documents Pixel Map v1.
+- `src/project-adapter.js` : convertit l’état interne vers le format portable et inversement.
+- `docs/PIXEL_MAP_V1.md` : spécification lisible du format.
+- `docs/pixel-map-v1.schema.json` : schéma JSON structurel.
 
 ## Exemple : dessiner une pièce
 
@@ -39,3 +43,7 @@ npm run check
 ```
 
 Ouvrir ensuite `http://localhost:8000`. Le petit serveur est nécessaire au chargement des modules JavaScript locaux.
+
+## Dimensions dynamiques
+
+Chaque projet porte sa propre configuration `state.grid` (`columns`, `rows`, `cellWidth`, `cellHeight`). Le renderer dimensionne le canvas à partir de cette configuration, les outils l’utilisent pour convertir les pointeurs en cases et l’adaptateur la conserve dans Pixel Map v1. Réduire une grille nécessite une confirmation si des données seraient rognées.

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixel-map.local/schema/pixel-map-v1.schema.json",
+  "title": "Pixel Map v1",
+  "type": "object",
+  "required": ["format", "version", "id", "name", "map", "grid", "resources", "layers", "collision", "objects", "zones", "properties"],
+  "properties": {
+    "format": { "const": "pixel-map" },
+    "version": { "const": "1.0" },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string" },
+    "map": {
+      "type": "object", "required": ["width", "height"],
+      "properties": { "width": { "type": "integer", "minimum": 1 }, "height": { "type": "integer", "minimum": 1 }, "background": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "grid": {
+      "type": "object", "required": ["columns", "rows", "cellWidth", "cellHeight"],
+      "properties": { "columns": { "type": "integer", "minimum": 1 }, "rows": { "type": "integer", "minimum": 1 }, "cellWidth": { "type": "integer", "minimum": 1 }, "cellHeight": { "type": "integer", "minimum": 1 } },
+      "additionalProperties": false
+    },
+    "resources": { "type": "array", "items": { "$ref": "#/$defs/resource" } },
+    "layers": { "type": "array", "items": { "$ref": "#/$defs/layer" } },
+    "collision": { "$ref": "#/$defs/collision" },
+    "objects": { "type": "array", "items": { "$ref": "#/$defs/object" } },
+    "zones": { "type": "array", "items": { "$ref": "#/$defs/zone" } },
+    "properties": { "$ref": "#/$defs/properties" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "properties": { "type": "object" },
+    "point": { "type": "object", "required": ["x", "y"], "properties": { "x": { "type": "number" }, "y": { "type": "number" } }, "additionalProperties": false },
+    "resource": {
+      "type": "object", "required": ["id", "type", "source", "properties"],
+      "properties": { "id": { "type": "string", "minLength": 1 }, "type": { "enum": ["image", "atlas"] }, "source": { "type": "string", "minLength": 1 }, "width": { "type": "integer", "minimum": 1 }, "height": { "type": "integer", "minimum": 1 }, "properties": { "$ref": "#/$defs/properties" } },
+      "additionalProperties": false
+    },
+    "tile": {
+      "type": "object", "required": ["x", "y", "resource", "rotation", "flipX", "flipY", "properties"],
+      "properties": { "x": { "type": "integer", "minimum": 0 }, "y": { "type": "integer", "minimum": 0 }, "resource": { "type": "string" }, "rotation": { "enum": [0, 90, 180, 270] }, "flipX": { "type": "boolean" }, "flipY": { "type": "boolean" }, "properties": { "$ref": "#/$defs/properties" } },
+      "additionalProperties": false
+    },
+    "layer": {
+      "type": "object", "required": ["id", "name", "type", "visible", "opacity", "properties"],
+      "properties": { "id": { "type": "string", "minLength": 1 }, "name": { "type": "string" }, "type": { "enum": ["tile", "sprite", "image"] }, "visible": { "type": "boolean" }, "opacity": { "type": "number", "minimum": 0, "maximum": 1 }, "offset": { "$ref": "#/$defs/point" }, "resource": { "type": "string" }, "tiles": { "type": "array", "items": { "$ref": "#/$defs/tile" } }, "sprites": { "type": "array" }, "properties": { "$ref": "#/$defs/properties" } },
+      "additionalProperties": false
+    },
+    "collision": {
+      "type": "object", "required": ["encoding", "defaultBlocked", "cells", "properties"],
+      "properties": { "encoding": { "const": "sparse" }, "defaultBlocked": { "type": "boolean" }, "cells": { "type": "array", "items": { "type": "object", "required": ["x", "y", "blocked", "properties"], "properties": { "x": { "type": "integer", "minimum": 0 }, "y": { "type": "integer", "minimum": 0 }, "blocked": { "type": "boolean" }, "type": { "type": "string" }, "properties": { "$ref": "#/$defs/properties" } }, "additionalProperties": false } }, "properties": { "$ref": "#/$defs/properties" } },
+      "additionalProperties": false
+    },
+    "object": {
+      "type": "object", "required": ["id", "type", "position", "properties"],
+      "properties": { "id": { "type": "string", "minLength": 1 }, "type": { "type": "string", "minLength": 1 }, "name": { "type": "string" }, "position": { "$ref": "#/$defs/point" }, "size": { "type": "object", "required": ["width", "height"], "properties": { "width": { "type": "number", "exclusiveMinimum": 0 }, "height": { "type": "number", "exclusiveMinimum": 0 } }, "additionalProperties": false }, "rotation": { "type": "number" }, "layer": { "type": "string" }, "resource": { "type": "string" }, "properties": { "$ref": "#/$defs/properties" } },
+      "additionalProperties": false
+    },
+    "zone": {
+      "type": "object", "required": ["id", "type", "shape", "properties"],
+      "properties": { "id": { "type": "string", "minLength": 1 }, "type": { "type": "string", "minLength": 1 }, "name": { "type": "string" }, "shape": { "oneOf": [{ "type": "object", "required": ["type", "x", "y", "width", "height"], "properties": { "type": { "const": "rectangle" }, "x": { "type": "number" }, "y": { "type": "number" }, "width": { "type": "number", "exclusiveMinimum": 0 }, "height": { "type": "number", "exclusiveMinimum": 0 } }, "additionalProperties": false }, { "type": "object", "required": ["type", "points"], "properties": { "type": { "const": "polygon" }, "points": { "type": "array", "minItems": 3, "items": { "$ref": "#/$defs/point" } } }, "additionalProperties": false }] }, "properties": { "$ref": "#/$defs/properties" } },
+      "additionalProperties": false
+    }
+  }
+}
