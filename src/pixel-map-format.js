@@ -1,3 +1,5 @@
+import { isPortableImageSource } from './portable-assets.js';
+
 export const PIXEL_MAP_FORMAT = 'pixel-map';
 export const PIXEL_MAP_PROJECT_FORMAT = 'pixel-map-project';
 export const PIXEL_MAP_VERSION = '1.0';
@@ -101,6 +103,7 @@ export function validatePixelMap(document) {
   resources.forEach((resource, index) => {
     if (!['image', 'atlas'].includes(resource.type)) issues.push(issue('error', `resources[${index}].type`, 'invalid-resource-type', 'Type de ressource inconnu.'));
     if (!resource.source || typeof resource.source !== 'string') issues.push(issue('error', `resources[${index}].source`, 'missing-source', 'Une source est obligatoire.'));
+    else if (!isPortableImageSource(resource.source)) issues.push(issue('error', `resources[${index}].source`, 'non-portable-resource', 'La source doit être une image embarquée, une URL HTTPS ou un chemin relatif.'));
     validateProperties(resource.properties ?? {}, `resources[${index}].properties`, issues);
   });
 

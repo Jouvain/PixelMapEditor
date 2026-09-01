@@ -1,6 +1,7 @@
 import { applySerializable, normalizeGrid } from './map-state.js';
 import { ASSETS } from './assets.js';
 import { createPixelMapDocument, createPixelMapProject } from './pixel-map-format.js';
+import { migrateLegacyAssetSource, portableAssetSource } from './portable-assets.js';
 
 const slug = (value) => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'untitled-map';
 const clone = (value) => structuredClone(value);
@@ -14,7 +15,8 @@ function replaceById(items, id, replacement) {
 
 function mergeResource(existing, generated) {
   if (!existing) return generated;
-  return { ...existing, ...generated, source: existing.source ?? generated.source, properties: clone(existing.properties ?? generated.properties) };
+  const source = migrateLegacyAssetSource(existing.source) || existing.source || generated.source;
+  return { ...existing, ...generated, source, properties: clone(existing.properties ?? generated.properties) };
 }
 
 function objectsInOriginalOrder(originalObjects, editedObjects) {
@@ -51,10 +53,10 @@ export function stateToDocument(state) {
   const knownAssetIds = new Set(ASSETS.map((item) => item.id));
   const assetFor = (object) => object.assetId || (knownAssetIds.has(object.type) ? object.type : null);
   const usedAssets = new Set(state.objects.map(assetFor).filter(Boolean));
-  const floorResource = { id: `floor.${state.floor}`, type: 'image', source: `asset://floors/${state.floor}`, width: cellWidth, height: cellHeight, properties: {} };
+  const floorResource = { id: `floor.${state.floor}`, type: 'image', source: portableAssetSource('floors', state.floor), width: cellWidth, height: cellHeight, properties: { embedded: true, mediaType: 'image/svg+xml' } };
   replaceById(document.resources, floorResource.id, mergeResource(document.resources.find((item) => item.id === floorResource.id), floorResource));
   ASSETS.filter((item) => usedAssets.has(item.id)).forEach((item) => {
-    const generated = { id: `asset.${item.id}`, type: 'image', source: `asset://objects/${item.id}`, width: cellWidth, height: cellHeight, properties: {} };
+    const generated = { id: `asset.${item.id}`, type: 'image', source: portableAssetSource('objects', item.id), width: 96, height: 96, properties: { embedded: true, mediaType: 'image/svg+xml' } };
     replaceById(document.resources, generated.id, mergeResource(document.resources.find((resource) => resource.id === generated.id), generated));
   });
 

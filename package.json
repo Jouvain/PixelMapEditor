@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "python -m http.server 8000",
-    "check": "node --check app.js && node --check src/map-state.js && node --check src/assets.js && node --check src/map-renderer.js && node --check src/tools.js && node --check src/export.js && node --check src/pixel-map-format.js && node --check src/project-adapter.js",
+    "check": "node --check app.js && node --check src/map-state.js && node --check src/assets.js && node --check src/portable-assets.js && node --check src/map-renderer.js && node --check src/tools.js && node --check src/export.js && node --check src/pixel-map-format.js && node --check src/project-adapter.js",
     "test": "node --test"
   }
 }

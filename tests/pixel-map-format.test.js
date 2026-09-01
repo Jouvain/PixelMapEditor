@@ -6,6 +6,8 @@ import {
 } from '../src/map-state.js';
 import { projectToState, stateToDocument, stateToProject } from '../src/project-adapter.js';
 import { validatePixelMap, validatePixelMapProject } from '../src/pixel-map-format.js';
+import { migrateLegacyAssetSources } from '../src/portable-assets.js';
+import { importProjectFile } from '../src/export.js';
 
 test('l’état actuel produit un document Pixel Map v1 valide', () => {
   const document = stateToDocument(createMapState());
@@ -15,6 +17,8 @@ test('l’état actuel produit un document Pixel Map v1 valide', () => {
   assert.equal(document.version, '1.0');
   assert.equal(document.map.width, document.grid.columns * document.grid.cellWidth);
   assert.equal(document.collision.defaultBlocked, true);
+  assert.ok(document.resources.every((resource) => resource.source.startsWith('data:image/svg+xml')));
+  assert.ok(document.resources.every((resource) => !resource.source.startsWith('asset://')));
 });
 
 test('le projet sépare les données portables de l’état de l’éditeur', () => {
@@ -162,6 +166,32 @@ test('une zone générique fait un aller-retour et peut être supprimée', () =>
   destination.selectedEntity = { kind: 'zone', id: destination.zones[0].id };
   assert.equal(deleteSelectedEntity(destination), true);
   assert.equal(destination.zones.length, 0);
+});
+
+test('une URI asset inconnue est refusée car elle dépendrait d’un catalogue implicite', () => {
+  const document = stateToDocument(createMapState());
+  document.resources[0].source = 'asset://custom/secret';
+  const validation = validatePixelMap(document);
+  assert.equal(validation.valid, false);
+  assert.ok(validation.issues.some((item) => item.code === 'non-portable-resource'));
+});
+
+test('les anciennes URI internes sont migrées vers des images embarquées', () => {
+  const document = stateToDocument(createMapState());
+  document.resources[0].source = 'asset://floors/blue';
+  document.resources.push({ id: 'asset.desk', type: 'image', source: 'asset://objects/desk', width: 32, height: 32, properties: {} });
+  assert.equal(migrateLegacyAssetSources(document), 2);
+  assert.ok(document.resources.every((resource) => resource.source.startsWith('data:image/svg+xml')));
+  assert.equal(validatePixelMap(document).valid, true);
+});
+
+test('l’import de projet migre les anciennes URI avant validation', async () => {
+  const project = stateToProject(createMapState());
+  project.document.resources[0].source = 'asset://floors/blue';
+  const state = createMapState();
+  const result = await importProjectFile({ text: async () => JSON.stringify(project) }, state);
+  assert.equal(result.imported, true);
+  assert.ok(state.sourceDocument.resources[0].source.startsWith('data:image/svg+xml'));
 });
 
 test('une zone polygonale peut être créée, sélectionnée et réimportée', () => {

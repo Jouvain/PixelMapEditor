@@ -1,6 +1,7 @@
 import { applySerializable } from './map-state.js';
 import { projectToState, stateToDocument, stateToProject } from './project-adapter.js';
 import { createPixelMapProject, PIXEL_MAP_FORMAT, PIXEL_MAP_PROJECT_FORMAT, validatePixelMap, validatePixelMapProject } from './pixel-map-format.js';
+import { migrateLegacyAssetSources } from './portable-assets.js';
 
 const STORAGE_KEY = 'pixel-map-project-v1';
 const LEGACY_STORAGE_KEY = 'pixel-map';
@@ -55,6 +56,7 @@ export async function importProjectFile(file, state) {
   const data = JSON.parse(await file.text());
   const project = data.format === PIXEL_MAP_FORMAT ? createPixelMapProject(data) : data;
   if (project.format !== PIXEL_MAP_PROJECT_FORMAT) throw new Error('Format attendu : pixel-map ou pixel-map-project.');
+  migrateLegacyAssetSources(project.document);
   const validation = validatePixelMapProject(project);
   if (!validation.valid) return { imported: false, validation };
   return { imported: true, validation, zoom: projectToState(project, state) };

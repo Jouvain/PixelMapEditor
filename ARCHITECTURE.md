@@ -57,3 +57,9 @@ Chaque projet porte sa propre configuration `state.grid` (`columns`, `rows`, `ce
 En Habillage, `state.entityTool` choisit entre placement d’asset, création d’objet, dessin de zone et sélection. Les objets et zones possèdent un identifiant stable, un type opaque, un nom facultatif et des propriétés JSON libres. L’inspecteur ne donne aucun sens de jeu à ces données ; les adaptateurs futurs restent responsables de leur interprétation.
 
 Les zones peuvent être rectangulaires ou polygonales. Un polygone est construit par sommets, sélectionné par un test point-dans-polygone et ses sommets sont éditables dans le canvas. Les coordonnées exportées restent des coordonnées logiques Pixel Map v1.
+
+## Ressources graphiques portables
+
+Les ressources produites par l’éditeur sont embarquées directement dans le JSON sous forme d’URI `data:image/svg+xml`. Un consommateur Pixel Map n’a donc besoin ni du catalogue de PixelMapEditor, ni d’un résolveur propriétaire. Le format accepte aussi une URL HTTPS ou un chemin relatif vers un fichier image, afin de permettre à un autre producteur de distribuer un JSON accompagné de ses images.
+
+Les anciennes URI internes `asset://objects/...` et `asset://floors/...` du catalogue connu sont converties à l’import. Toute autre URI `asset://` est rejetée par la validation, puisqu’elle ne peut pas être résolue de manière indépendante.
