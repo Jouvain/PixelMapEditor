@@ -1,0 +1,23 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "id": "readme_pixelmapeditor",
+      "label": "PixelMapEditor",
+      "author": null,
+      "captured_at": null,
+      "community": 0,
+      "contributor": null,
+      "file_type": "document",
+      "norm_label": "pixelmapeditor",
+      "source_file": "README.md",
+      "source_location": null,
+      "source_url": null
+    }
+  ],
+  "links": [],
+  "hyperedges": [],
+  "built_at_commit": "3a19d914fd5f624637d95a34cde4855dd65749da"
+}
