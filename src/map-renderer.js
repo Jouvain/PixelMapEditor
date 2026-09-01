@@ -12,7 +12,7 @@ export class MapRenderer {
   setPreview(preview) { this.preview = preview; this.draw(); }
   clearPreview() { this.preview = null; }
 
-  draw() {
+  draw({ editorOverlays = true } = {}) {
     const { context, canvas, state } = this;
     this.resizeCanvas();
     context.clearRect(0, 0, canvas.width, canvas.height);
@@ -22,12 +22,15 @@ export class MapRenderer {
       const [x, y] = key.split(',').map(Number);
       this.drawFloorTile(x, y);
     });
-    if (state.step === 1 && state.activeTool === 'collision') this.drawCollisionOverlay();
+    if (editorOverlays && state.step === 1 && state.activeTool === 'collision') this.drawCollisionOverlay();
     if (state.showGrid) this.drawGrid();
     this.drawWalls();
     this.drawDoors();
-    if (state.step === 2) this.drawObjects();
-    if (this.preview) this.drawPreview();
+    if (state.step === 2) {
+      if (editorOverlays) this.drawZones();
+      this.drawObjects(editorOverlays);
+    }
+    if (editorOverlays && this.preview) this.drawPreview();
   }
 
   drawCollisionOverlay() {
@@ -118,21 +121,49 @@ export class MapRenderer {
     });
   }
 
-  drawObjects() {
+  drawObjects(editorOverlays = true) {
     const { cellWidth, cellHeight } = this.state.grid;
     const scale = 0.58 * Math.min(cellWidth, cellHeight) / 32;
-    this.state.objects.forEach((object) => drawSprite(this.context, object.type,
-      (object.x + 0.5) * cellWidth, (object.y + 0.5) * cellHeight, scale, object.rotation));
+    this.state.objects.forEach((object) => {
+      const centerX = (object.x + 0.5) * cellWidth, centerY = (object.y + 0.5) * cellHeight;
+      if (object.assetId) drawSprite(this.context, object.assetId, centerX, centerY, scale, object.rotation);
+      else if (editorOverlays) {
+        this.context.fillStyle = '#7248a8'; this.context.strokeStyle = '#fff'; this.context.lineWidth = 2;
+        this.context.beginPath(); this.context.arc(centerX, centerY, Math.max(5, Math.min(cellWidth, cellHeight) * 0.24), 0, Math.PI * 2); this.context.fill(); this.context.stroke();
+      }
+      if (editorOverlays && this.state.selectedEntity?.kind === 'object' && this.state.selectedEntity.id === object.id) {
+        this.context.strokeStyle = '#ffb35f'; this.context.lineWidth = 3;
+        this.context.strokeRect(object.x * cellWidth + 2, object.y * cellHeight + 2, cellWidth - 4, cellHeight - 4);
+      }
+    });
+  }
+
+  drawZones() {
+    this.state.zones.forEach((zone) => {
+      const shape = zone.shape;
+      if (shape.type !== 'rectangle') return;
+      const selected = this.state.selectedEntity?.kind === 'zone' && this.state.selectedEntity.id === zone.id;
+      this.context.fillStyle = selected ? 'rgba(232, 142, 47, 0.28)' : 'rgba(91, 84, 196, 0.18)';
+      this.context.strokeStyle = selected ? '#e88e2f' : '#5b54c4';
+      this.context.lineWidth = selected ? 3 : 2;
+      this.context.setLineDash([6, 4]);
+      this.context.fillRect(shape.x, shape.y, shape.width, shape.height);
+      this.context.strokeRect(shape.x, shape.y, shape.width, shape.height);
+      this.context.setLineDash([]);
+      this.context.fillStyle = selected ? '#8b4b13' : '#3e398b';
+      this.context.font = '10px sans-serif';
+      this.context.fillText(zone.name || zone.type, shape.x + 5, shape.y + 14);
+    });
   }
 
   drawPreview() {
-    const { start, end, erase, collision, blocked } = this.preview;
+    const { start, end, erase, collision, blocked, zone } = this.preview;
     const { cellWidth, cellHeight } = this.state.grid;
     const x = Math.min(start.x, end.x), y = Math.min(start.y, end.y);
     const width = Math.abs(start.x - end.x) + 1, height = Math.abs(start.y - end.y) + 1;
-    this.context.fillStyle = collision ? (blocked ? 'rgba(180, 38, 32, 0.7)' : 'rgba(40, 190, 85, 0.7)') : (erase ? '#bd392a44' : '#d66a3244');
+    this.context.fillStyle = zone ? 'rgba(91, 84, 196, 0.28)' : (collision ? (blocked ? 'rgba(180, 38, 32, 0.7)' : 'rgba(40, 190, 85, 0.7)') : (erase ? '#bd392a44' : '#d66a3244'));
     this.context.fillRect(x * cellWidth, y * cellHeight, width * cellWidth, height * cellHeight);
-    this.context.strokeStyle = collision ? (blocked ? '#8f1f1b' : '#18743a') : '#d66a32'; this.context.lineWidth = 2;
+    this.context.strokeStyle = zone ? '#5b54c4' : (collision ? (blocked ? '#8f1f1b' : '#18743a') : '#d66a32'); this.context.lineWidth = 2;
     this.context.strokeRect(x * cellWidth, y * cellHeight, width * cellWidth, height * cellHeight);
   }
 }

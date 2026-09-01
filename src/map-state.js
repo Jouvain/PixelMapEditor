@@ -28,6 +28,8 @@ export function createMapState(grid = DEFAULT_GRID) {
     step: 1,
     activeTool: 'room',
     collisionBrush: 'walkable',
+    entityTool: 'asset',
+    selectedEntity: null,
     selectedAsset: 'desk',
     grid: normalizedGrid,
     cells: initialCells,
@@ -144,7 +146,62 @@ export function placeOrRotateObject(state, position) {
   const object = state.objects.find((item) =>
     Math.abs(item.x - position.x) < 2 && Math.abs(item.y - position.y) < 2);
   if (object) object.rotation = ((object.rotation || 0) + 1) % 4;
-  else state.objects.push({ id: crypto.randomUUID(), type: state.selectedAsset, ...position, rotation: 0 });
+  else state.objects.push({ id: crypto.randomUUID(), type: `furniture.${state.selectedAsset}`, assetId: state.selectedAsset, name: '', properties: {}, ...position, rotation: 0 });
+  const selected = object || state.objects.at(-1);
+  state.selectedEntity = { kind: 'object', id: selected.id };
+  return true;
+}
+
+export function placeGenericObject(state, position) {
+  const object = { id: crypto.randomUUID(), type: 'object.generic', assetId: null, name: 'Nouvel objet', properties: {}, ...position, rotation: 0 };
+  state.objects.push(object);
+  state.selectedEntity = { kind: 'object', id: object.id };
+  return object;
+}
+
+export function createRectangleZone(state, start, end) {
+  const { cellWidth, cellHeight } = state.grid;
+  const left = Math.min(start.x, end.x), top = Math.min(start.y, end.y);
+  const zone = {
+    id: crypto.randomUUID(), type: 'zone.generic', name: 'Nouvelle zone', properties: {},
+    shape: {
+      type: 'rectangle', x: left * cellWidth, y: top * cellHeight,
+      width: (Math.abs(start.x - end.x) + 1) * cellWidth,
+      height: (Math.abs(start.y - end.y) + 1) * cellHeight,
+    },
+  };
+  state.zones.push(zone);
+  state.selectedEntity = { kind: 'zone', id: zone.id };
+  return zone;
+}
+
+export function getSelectedEntity(state) {
+  if (!state.selectedEntity) return null;
+  const collection = state.selectedEntity.kind === 'zone' ? state.zones : state.objects;
+  return collection.find((item) => item.id === state.selectedEntity.id) || null;
+}
+
+export function selectEntityAt(state, position) {
+  const object = [...state.objects].reverse().find((item) => item.x === position.x && item.y === position.y);
+  if (object) return (state.selectedEntity = { kind: 'object', id: object.id });
+  const logicalX = (position.x + 0.5) * state.grid.cellWidth;
+  const logicalY = (position.y + 0.5) * state.grid.cellHeight;
+  const zone = [...state.zones].reverse().find((item) => {
+    const shape = item.shape;
+    if (shape.type === 'rectangle') return logicalX >= shape.x && logicalX <= shape.x + shape.width && logicalY >= shape.y && logicalY <= shape.y + shape.height;
+    return false;
+  });
+  state.selectedEntity = zone ? { kind: 'zone', id: zone.id } : null;
+  return state.selectedEntity;
+}
+
+export function deleteSelectedEntity(state) {
+  if (!state.selectedEntity) return false;
+  const collection = state.selectedEntity.kind === 'zone' ? state.zones : state.objects;
+  const index = collection.findIndex((item) => item.id === state.selectedEntity.id);
+  if (index < 0) return false;
+  collection.splice(index, 1);
+  state.selectedEntity = null;
   return true;
 }
 
@@ -158,6 +215,8 @@ export function applySerializable(state, data) {
     projectName: data.projectName ?? data.name ?? state.projectName,
     activeTool: data.activeTool ?? state.activeTool,
     collisionBrush: data.collisionBrush ?? state.collisionBrush,
+    entityTool: data.entityTool ?? state.entityTool,
+    selectedEntity: data.selectedEntity ?? null,
     selectedAsset: data.selectedAsset ?? state.selectedAsset,
     wallColor: data.wallColor ?? data.wall ?? state.wallColor,
     wallWidth: data.wallWidth ?? data.width ?? state.wallWidth,
@@ -175,6 +234,9 @@ export function applySerializable(state, data) {
   state.doors.forEach((door) => { door.side ||= door.s; });
   state.objects.forEach((object) => {
     object.type ||= object.t;
+    if (object.assetId === undefined) object.assetId = object.type;
+    object.name ??= '';
+    object.properties ??= {};
     object.rotation ??= object.r || 0;
   });
 }

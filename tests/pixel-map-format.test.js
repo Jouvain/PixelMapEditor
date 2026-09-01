@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeGridResize, createMapState, normalizeGrid, paintCollisionRectangle, paintRectangle, resizeGrid } from '../src/map-state.js';
+import {
+  analyzeGridResize, createMapState, createRectangleZone, deleteSelectedEntity,
+  normalizeGrid, paintCollisionRectangle, paintRectangle, placeGenericObject, resizeGrid,
+} from '../src/map-state.js';
 import { projectToState, stateToDocument, stateToProject } from '../src/project-adapter.js';
 import { validatePixelMap, validatePixelMapProject } from '../src/pixel-map-format.js';
 
@@ -125,4 +128,38 @@ test('l’export et l’import conservent les collisions indépendantes', () => 
   assert.equal(destination.collisionCells.has('3,3'), false);
   assert.equal(destination.cells.has('0,0'), false);
   assert.equal(destination.collisionCells.has('0,0'), true);
+});
+
+test('un objet générique conserve son type, son nom et ses propriétés', () => {
+  const source = createMapState();
+  const object = placeGenericObject(source, { x: 2, y: 4 });
+  object.type = 'spawn.player';
+  object.name = 'Départ principal';
+  object.properties = { facing: 'south', team: 1 };
+  const document = stateToDocument(source);
+  assert.equal(validatePixelMap(document).valid, true);
+  const exported = document.objects.find((item) => item.id === object.id);
+  assert.equal(exported.type, 'spawn.player');
+  assert.deepEqual(exported.properties, { facing: 'south', team: 1 });
+  assert.equal(exported.resource, undefined);
+  const destination = createMapState();
+  projectToState(stateToProject(source), destination);
+  assert.equal(destination.objects.find((item) => item.id === object.id).name, 'Départ principal');
+});
+
+test('une zone générique fait un aller-retour et peut être supprimée', () => {
+  const source = createMapState({ columns: 10, rows: 10, cellWidth: 16, cellHeight: 24 });
+  const zone = createRectangleZone(source, { x: 1, y: 2 }, { x: 3, y: 4 });
+  zone.type = 'room.meeting';
+  zone.properties = { capacity: 8 };
+  assert.deepEqual(zone.shape, { type: 'rectangle', x: 16, y: 48, width: 48, height: 72 });
+  const project = stateToProject(source);
+  assert.equal(validatePixelMapProject(project).valid, true);
+  const destination = createMapState();
+  projectToState(project, destination);
+  assert.equal(destination.zones[0].type, 'room.meeting');
+  assert.deepEqual(destination.zones[0].properties, { capacity: 8 });
+  destination.selectedEntity = { kind: 'zone', id: destination.zones[0].id };
+  assert.equal(deleteSelectedEntity(destination), true);
+  assert.equal(destination.zones.length, 0);
 });

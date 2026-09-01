@@ -51,3 +51,7 @@ Chaque projet porte sa propre configuration `state.grid` (`columns`, `rows`, `ce
 ## Collision indépendante
 
 `state.cells` décrit uniquement les surfaces graphiques du blueprint. `state.collisionCells` décrit les cases praticables de la couche logique, avec toutes les autres cases bloquées par défaut. L’outil Collision modifie uniquement cette seconde collection. L’adaptateur exporte et importe les deux couches séparément.
+
+## Objets et zones génériques
+
+En Habillage, `state.entityTool` choisit entre placement d’asset, création d’objet, dessin de zone et sélection. Les objets et zones possèdent un identifiant stable, un type opaque, un nom facultatif et des propriétés JSON libres. L’inspecteur ne donne aucun sens de jeu à ces données ; les adaptateurs futurs restent responsables de leur interprétation.

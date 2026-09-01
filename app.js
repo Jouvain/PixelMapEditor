@@ -1,5 +1,8 @@
 import { ASSETS, drawSprite } from './src/assets.js';
-import { analyzeGridResize, createHistory, createMapState, resizeGrid } from './src/map-state.js';
+import {
+  analyzeGridResize, createHistory, createMapState, deleteSelectedEntity,
+  getSelectedEntity, resizeGrid,
+} from './src/map-state.js';
 import { MapRenderer } from './src/map-renderer.js';
 import { ToolController } from './src/tools.js';
 import {
@@ -54,6 +57,15 @@ function syncControls() {
   $$('.floor').forEach((button) => button.classList.toggle('on', button.dataset.floor === state.floor));
   $('#collisionSettings').hidden = state.activeTool !== 'collision';
   $$('[data-collision]').forEach((button) => button.classList.toggle('on', button.dataset.collision === state.collisionBrush));
+  $$('[data-entity-tool]').forEach((button) => button.classList.toggle('on', button.dataset.entityTool === state.entityTool));
+  const help = {
+    asset: 'Choisissez un asset puis cliquez sur la carte.',
+    object: 'Cliquez pour créer un objet générique.',
+    zone: 'Cliquez-glissez pour dessiner une zone rectangulaire.',
+    select: 'Cliquez sur un objet ou une zone pour l’inspecter.',
+  };
+  $('#entityHelp').textContent = help[state.entityTool];
+  $('#assetLibrary').hidden = state.entityTool !== 'asset';
   $('#width').value = state.wallWidth;
   $('#widthOut').textContent = `${state.wallWidth} px`;
   $('#grid').checked = state.showGrid;
@@ -64,7 +76,17 @@ function syncControls() {
   $('#mapResolution').textContent = `${state.grid.columns * state.grid.cellWidth} × ${state.grid.rows * state.grid.cellHeight}`;
 }
 
-function refresh() { updateStep(); updateStats(); syncControls(); renderer.draw(); }
+function refresh() { updateStep(); updateStats(); syncControls(); renderer.draw(); renderInspector(); }
+
+function renderInspector() {
+  const entity = getSelectedEntity(state);
+  $('#entityInspector').hidden = !entity;
+  if (!entity) return;
+  $('#entityKind').textContent = state.selectedEntity.kind === 'zone' ? `Zone · ${entity.id}` : `Objet · ${entity.id}`;
+  $('#entityType').value = entity.type;
+  $('#entityName').value = entity.name || '';
+  $('#entityProperties').value = JSON.stringify(entity.properties || {}, null, 2);
+}
 
 function renderAssetLibrary() {
   const category = $('.cats .on').dataset.cat;
@@ -88,6 +110,7 @@ new ToolController({
   canvas, state, renderer, history,
   onChange: () => { markDirty(); updateStats(); },
   onPosition: (position) => { $('#coords').innerHTML = position ? `X: ${position.x} &nbsp; Y: ${position.y}` : 'X: — &nbsp; Y: —'; },
+  onSelection: renderInspector,
   notify,
 });
 
@@ -101,6 +124,28 @@ $$('[data-collision]').forEach((button) => button.addEventListener('click', () =
   state.collisionBrush = button.dataset.collision;
   syncControls(); renderer.draw();
 }));
+$$('[data-entity-tool]').forEach((button) => button.addEventListener('click', () => {
+  state.entityTool = button.dataset.entityTool;
+  syncControls(); renderer.draw(); renderInspector();
+}));
+$('#applyEntity').addEventListener('click', () => {
+  const entity = getSelectedEntity(state);
+  if (!entity) return;
+  try {
+    const type = $('#entityType').value.trim();
+    if (!type) throw new Error('Le type est obligatoire.');
+    const properties = JSON.parse($('#entityProperties').value || '{}');
+    if (!properties || Array.isArray(properties) || typeof properties !== 'object') throw new Error('Les propriétés doivent être un objet JSON.');
+    history.checkpoint();
+    entity.type = type; entity.name = $('#entityName').value.trim(); entity.properties = properties;
+    markDirty(); renderer.draw(); renderInspector(); notify('Entité mise à jour');
+  } catch (error) { notify(`Propriétés invalides : ${error.message}`); }
+});
+$('#deleteEntity').addEventListener('click', () => {
+  if (!getSelectedEntity(state)) return;
+  history.checkpoint(); deleteSelectedEntity(state);
+  markDirty(); renderer.draw(); renderInspector(); notify('Entité supprimée');
+});
 $$('.step').forEach((button) => button.addEventListener('click', () => { state.step = Number(button.dataset.step); refresh(); }));
 $$('.swatch').forEach((button) => button.addEventListener('click', () => {
   state.wallColor = button.dataset.color;
@@ -151,10 +196,9 @@ $('#save').addEventListener('click', () => {
   else { $('#saved').textContent = 'Sauvegardé'; notify('Projet Pixel Map v1 sauvegardé'); }
 });
 $('#export').addEventListener('click', () => {
-  const activeTool = state.activeTool;
-  if (activeTool === 'collision') { state.activeTool = 'select'; renderer.draw(); }
+  renderer.draw({ editorOverlays: false });
   exportPng(canvas, $('#name').value);
-  if (activeTool === 'collision') { state.activeTool = activeTool; renderer.draw(); }
+  renderer.draw();
   notify('Export PNG généré');
 });
 $('#exportJson').addEventListener('click', () => {
@@ -177,7 +221,7 @@ $('#projectFile').addEventListener('change', async (event) => {
     if (error) notify(error);
     else {
       zoom = result.zoom; setZoom(0); $('#name').value = state.projectName;
-      renderAssetLibrary(); refresh(); markDirty(); notify('Projet Pixel Map v1 importé');
+      renderAssetLibrary(); refresh(); renderInspector(); markDirty(); notify('Projet Pixel Map v1 importé');
     }
   } catch (error) { notify(error.message); }
   event.target.value = '';
@@ -204,3 +248,4 @@ $('#grid').checked = state.showGrid;
 renderAssetLibrary();
 setZoom(0);
 refresh();
+renderInspector();
