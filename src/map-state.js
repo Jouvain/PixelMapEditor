@@ -43,6 +43,8 @@ export function createMapState(grid = DEFAULT_GRID) {
     wallColor: '#deddd5',
     wallWidth: 8,
     showGrid: true,
+    sourceDocument: null,
+    sourceProject: null,
   };
 }
 

@@ -187,3 +187,68 @@ test('un polygone refuse moins de trois sommets', () => {
   const state = createMapState();
   assert.throws(() => createPolygonZone(state, [{ x: 1, y: 1 }, { x: 2, y: 2 }]), /au moins trois sommets/);
 });
+
+test('un import puis export conserve les données que l’éditeur ne sait pas modifier', () => {
+  const source = stateToProject(createMapState(), 0.75);
+  source.document.resources.push({
+    id: 'external.sign', type: 'image', source: 'https://example.test/sign.png',
+    width: 48, height: 72, properties: { licence: 'custom' },
+  });
+  source.document.layers.push({
+    id: 'external-overlay', name: 'Overlay externe', type: 'sprite', visible: false,
+    opacity: 0.4, offset: { x: 7, y: 9 }, sprites: [{
+      id: 'external-sprite', resource: 'external.sign', position: { x: 64, y: 96 },
+      rotation: 15, scale: { x: 2, y: 3 }, properties: { imported: true },
+    }], properties: { lockedByAdapter: true },
+  });
+  source.document.objects.push({
+    id: 'external-object', type: 'npc.vendor', name: 'Marchand', resource: 'external.sign',
+    position: { x: 80, y: 112 }, size: { width: 48, height: 72 }, rotation: 0,
+    layer: 'external-overlay', properties: { dialogue: 'welcome', stock: [1, 2] },
+  });
+  source.document.properties.adapter = { namespace: 'demo', enabled: true };
+  source.document.layers.find((item) => item.id === 'floor').tiles[0].properties = { biome: 'office' };
+  source.document.layers.find((item) => item.id === 'floor').tiles[0].rotation = 90;
+  source.document.collision.properties = { algorithm: 'nav-grid' };
+  source.document.collision.cells[0].properties = { movementCost: 3 };
+  source.editor.properties.adapterPanel = { tab: 'advanced' };
+
+  const state = createMapState();
+  projectToState(source, state);
+  state.projectName = 'Projet réenregistré';
+  const exported = stateToProject(state, 1.25);
+
+  assert.deepEqual(exported.document.resources.find((item) => item.id === 'external.sign'), source.document.resources.at(-1));
+  assert.deepEqual(exported.document.layers.find((item) => item.id === 'external-overlay'), source.document.layers.at(-1));
+  const object = exported.document.objects.find((item) => item.id === 'external-object');
+  assert.deepEqual(object.size, { width: 48, height: 72 });
+  assert.equal(object.layer, 'external-overlay');
+  assert.equal(object.resource, 'external.sign');
+  assert.deepEqual(object.properties, { dialogue: 'welcome', stock: [1, 2] });
+  assert.deepEqual(exported.document.properties.adapter, { namespace: 'demo', enabled: true });
+  assert.deepEqual(exported.document.layers.find((item) => item.id === 'floor').tiles[0].properties, { biome: 'office' });
+  assert.equal(exported.document.layers.find((item) => item.id === 'floor').tiles[0].rotation, 90);
+  assert.deepEqual(exported.document.collision.properties, { algorithm: 'nav-grid' });
+  assert.deepEqual(exported.document.collision.cells[0].properties, { movementCost: 3 });
+  assert.deepEqual(exported.editor.properties.adapterPanel, { tab: 'advanced' });
+  assert.equal(exported.document.name, 'Projet réenregistré');
+  assert.equal(exported.editor.zoom, 1.25);
+  assert.equal(validatePixelMapProject(exported).valid, true);
+});
+
+test('une collision defaultBlocked false conserve sa sémantique après aller-retour', () => {
+  const source = stateToProject(createMapState({ columns: 4, rows: 3, cellWidth: 16, cellHeight: 16 }));
+  source.document.collision.defaultBlocked = false;
+  source.document.collision.cells = [{ x: 1, y: 1, blocked: true, type: 'wall', properties: { material: 'stone' } }];
+  const state = createMapState();
+  projectToState(source, state);
+  assert.equal(state.collisionCells.size, 11);
+  assert.equal(state.collisionCells.has('1,1'), false);
+
+  const exported = stateToProject(state);
+  assert.equal(exported.document.collision.defaultBlocked, true);
+  assert.equal(exported.document.collision.cells.find((cell) => cell.x === 1 && cell.y === 1).blocked, true);
+  assert.deepEqual(exported.document.collision.cells.find((cell) => cell.x === 1 && cell.y === 1).properties, { material: 'stone' });
+  assert.equal(exported.document.collision.cells.filter((cell) => !cell.blocked).length, 11);
+  assert.equal(validatePixelMapProject(exported).valid, true);
+});
