@@ -29,6 +29,7 @@ export function createMapState(grid = DEFAULT_GRID) {
     activeTool: 'room',
     collisionBrush: 'walkable',
     entityTool: 'asset',
+    zoneShape: 'rectangle',
     selectedEntity: null,
     selectedAsset: 'desk',
     grid: normalizedGrid,
@@ -175,6 +176,32 @@ export function createRectangleZone(state, start, end) {
   return zone;
 }
 
+export function createPolygonZone(state, gridPoints) {
+  if (gridPoints.length < 3) throw new Error('Un polygone nécessite au moins trois sommets.');
+  const { cellWidth, cellHeight } = state.grid;
+  const zone = {
+    id: crypto.randomUUID(), type: 'zone.generic', name: 'Nouvelle zone', properties: {},
+    shape: {
+      type: 'polygon',
+      points: gridPoints.map((point) => ({ x: (point.x + 0.5) * cellWidth, y: (point.y + 0.5) * cellHeight })),
+    },
+  };
+  state.zones.push(zone);
+  state.selectedEntity = { kind: 'zone', id: zone.id };
+  return zone;
+}
+
+export function pointInPolygon(point, points) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i, i += 1) {
+    const a = points[i], b = points[j];
+    const crosses = (a.y > point.y) !== (b.y > point.y)
+      && point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x;
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
 export function getSelectedEntity(state) {
   if (!state.selectedEntity) return null;
   const collection = state.selectedEntity.kind === 'zone' ? state.zones : state.objects;
@@ -189,6 +216,7 @@ export function selectEntityAt(state, position) {
   const zone = [...state.zones].reverse().find((item) => {
     const shape = item.shape;
     if (shape.type === 'rectangle') return logicalX >= shape.x && logicalX <= shape.x + shape.width && logicalY >= shape.y && logicalY <= shape.y + shape.height;
+    if (shape.type === 'polygon') return pointInPolygon({ x: logicalX, y: logicalY }, shape.points);
     return false;
   });
   state.selectedEntity = zone ? { kind: 'zone', id: zone.id } : null;
@@ -216,6 +244,7 @@ export function applySerializable(state, data) {
     activeTool: data.activeTool ?? state.activeTool,
     collisionBrush: data.collisionBrush ?? state.collisionBrush,
     entityTool: data.entityTool ?? state.entityTool,
+    zoneShape: data.zoneShape ?? state.zoneShape,
     selectedEntity: data.selectedEntity ?? null,
     selectedAsset: data.selectedAsset ?? state.selectedAsset,
     wallColor: data.wallColor ?? data.wall ?? state.wallColor,

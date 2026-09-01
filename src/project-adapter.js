@@ -44,7 +44,7 @@ export function stateToDocument(state) {
 }
 
 export function stateToProject(state, zoom = 1) {
-  return createPixelMapProject(stateToDocument(state), { activeStep: state.step === 1 ? 'blueprint' : 'decoration', activeTool: state.activeTool, selectedLayer: state.step === 1 ? 'floor' : 'decoration', selectedAsset: state.selectedAsset, zoom, showGrid: state.showGrid, properties: { collisionBrush: state.collisionBrush, entityTool: state.entityTool } });
+  return createPixelMapProject(stateToDocument(state), { activeStep: state.step === 1 ? 'blueprint' : 'decoration', activeTool: state.activeTool, selectedLayer: state.step === 1 ? 'floor' : 'decoration', selectedAsset: state.selectedAsset, zoom, showGrid: state.showGrid, properties: { collisionBrush: state.collisionBrush, entityTool: state.entityTool, zoneShape: state.zoneShape } });
 }
 
 export function projectToState(project, state) {
@@ -62,6 +62,6 @@ export function projectToState(project, state) {
     rotation: Math.round((object.rotation || 0) / 90) % 4,
   }));
   const floorResource = floorLayer?.tiles?.[0]?.resource || 'floor.blue';
-  applySerializable(state, { projectName: document.name, grid, step: editor.activeStep === 'blueprint' ? 1 : 2, activeTool: editor.activeTool, collisionBrush: editor.properties?.collisionBrush, entityTool: editor.properties?.entityTool, selectedAsset: editor.selectedAsset, cells, collisionCells, doors, objects, zones: document.zones, floor: floorResource.replace('floor.', ''), wallColor: document.properties?.wall?.color, wallWidth: document.properties?.wall?.width, showGrid: editor.showGrid });
+  applySerializable(state, { projectName: document.name, grid, step: editor.activeStep === 'blueprint' ? 1 : 2, activeTool: editor.activeTool, collisionBrush: editor.properties?.collisionBrush, entityTool: editor.properties?.entityTool, zoneShape: editor.properties?.zoneShape, selectedAsset: editor.selectedAsset, cells, collisionCells, doors, objects, zones: document.zones, floor: floorResource.replace('floor.', ''), wallColor: document.properties?.wall?.color, wallWidth: document.properties?.wall?.width, showGrid: editor.showGrid });
   return editor.zoom ?? 1;
 }

@@ -66,6 +66,9 @@ function syncControls() {
   };
   $('#entityHelp').textContent = help[state.entityTool];
   $('#assetLibrary').hidden = state.entityTool !== 'asset';
+  $('#zoneShapeSettings').hidden = state.entityTool !== 'zone';
+  $('#polygonActions').hidden = state.zoneShape !== 'polygon';
+  $$('[data-zone-shape]').forEach((button) => button.classList.toggle('on', button.dataset.zoneShape === state.zoneShape));
   $('#width').value = state.wallWidth;
   $('#widthOut').textContent = `${state.wallWidth} px`;
   $('#grid').checked = state.showGrid;
@@ -106,7 +109,7 @@ function renderAssetLibrary() {
     });
 }
 
-new ToolController({
+const toolController = new ToolController({
   canvas, state, renderer, history,
   onChange: () => { markDirty(); updateStats(); },
   onPosition: (position) => { $('#coords').innerHTML = position ? `X: ${position.x} &nbsp; Y: ${position.y}` : 'X: — &nbsp; Y: —'; },
@@ -125,9 +128,16 @@ $$('[data-collision]').forEach((button) => button.addEventListener('click', () =
   syncControls(); renderer.draw();
 }));
 $$('[data-entity-tool]').forEach((button) => button.addEventListener('click', () => {
+  if (state.entityTool === 'zone' && button.dataset.entityTool !== 'zone') toolController.cancelPolygon();
   state.entityTool = button.dataset.entityTool;
   syncControls(); renderer.draw(); renderInspector();
 }));
+$$('[data-zone-shape]').forEach((button) => button.addEventListener('click', () => {
+  toolController.cancelPolygon(); state.zoneShape = button.dataset.zoneShape;
+  syncControls(); renderer.draw();
+}));
+$('#finishPolygon').addEventListener('click', () => toolController.finishPolygon());
+$('#cancelPolygon').addEventListener('click', () => toolController.cancelPolygon());
 $('#applyEntity').addEventListener('click', () => {
   const entity = getSelectedEntity(state);
   if (!entity) return;
@@ -237,6 +247,10 @@ $('#plus').addEventListener('click', () => setZoom(0.1));
 $('#minus').addEventListener('click', () => setZoom(-0.1));
 $('#fit').addEventListener('click', () => { zoom = 1; setZoom(0); });
 document.addEventListener('keydown', (event) => {
+  if (state.step === 2 && state.entityTool === 'zone' && state.zoneShape === 'polygon') {
+    if (event.key === 'Enter') { event.preventDefault(); toolController.finishPolygon(); return; }
+    if (event.key === 'Escape') { event.preventDefault(); toolController.cancelPolygon(); return; }
+  }
   if (event.ctrlKey && event.key.toLowerCase() === 'z') $('#undo').click();
   const shortcuts = { r: 'room', e: 'erase', d: 'door', v: 'select', c: 'collision' };
   if (shortcuts[event.key.toLowerCase()] && !/input/i.test(event.target.tagName)) $(`[data-tool=${shortcuts[event.key.toLowerCase()]}]`).click();

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  analyzeGridResize, createMapState, createRectangleZone, deleteSelectedEntity,
-  normalizeGrid, paintCollisionRectangle, paintRectangle, placeGenericObject, resizeGrid,
+  analyzeGridResize, createMapState, createPolygonZone, createRectangleZone, deleteSelectedEntity,
+  normalizeGrid, paintCollisionRectangle, paintRectangle, placeGenericObject, resizeGrid, selectEntityAt,
 } from '../src/map-state.js';
 import { projectToState, stateToDocument, stateToProject } from '../src/project-adapter.js';
 import { validatePixelMap, validatePixelMapProject } from '../src/pixel-map-format.js';
@@ -162,4 +162,28 @@ test('une zone générique fait un aller-retour et peut être supprimée', () =>
   destination.selectedEntity = { kind: 'zone', id: destination.zones[0].id };
   assert.equal(deleteSelectedEntity(destination), true);
   assert.equal(destination.zones.length, 0);
+});
+
+test('une zone polygonale peut être créée, sélectionnée et réimportée', () => {
+  const source = createMapState({ columns: 10, rows: 10, cellWidth: 20, cellHeight: 20 });
+  const zone = createPolygonZone(source, [{ x: 1, y: 1 }, { x: 6, y: 1 }, { x: 4, y: 6 }]);
+  zone.type = 'trigger.area';
+  zone.properties = { event: 'enter' };
+  assert.deepEqual(zone.shape.points[0], { x: 30, y: 30 });
+  source.selectedEntity = null;
+  assert.deepEqual(selectEntityAt(source, { x: 4, y: 3 }), { kind: 'zone', id: zone.id });
+  source.selectedEntity = null;
+  assert.equal(selectEntityAt(source, { x: 9, y: 9 }), null);
+  const project = stateToProject(source);
+  assert.equal(validatePixelMapProject(project).valid, true);
+  const destination = createMapState();
+  projectToState(project, destination);
+  assert.equal(destination.zones[0].shape.type, 'polygon');
+  assert.deepEqual(destination.zones[0].shape.points, zone.shape.points);
+  assert.deepEqual(destination.zones[0].properties, { event: 'enter' });
+});
+
+test('un polygone refuse moins de trois sommets', () => {
+  const state = createMapState();
+  assert.throws(() => createPolygonZone(state, [{ x: 1, y: 1 }, { x: 2, y: 2 }]), /au moins trois sommets/);
 });

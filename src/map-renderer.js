@@ -141,24 +141,55 @@ export class MapRenderer {
   drawZones() {
     this.state.zones.forEach((zone) => {
       const shape = zone.shape;
-      if (shape.type !== 'rectangle') return;
       const selected = this.state.selectedEntity?.kind === 'zone' && this.state.selectedEntity.id === zone.id;
       this.context.fillStyle = selected ? 'rgba(232, 142, 47, 0.28)' : 'rgba(91, 84, 196, 0.18)';
       this.context.strokeStyle = selected ? '#e88e2f' : '#5b54c4';
       this.context.lineWidth = selected ? 3 : 2;
       this.context.setLineDash([6, 4]);
-      this.context.fillRect(shape.x, shape.y, shape.width, shape.height);
-      this.context.strokeRect(shape.x, shape.y, shape.width, shape.height);
+      if (shape.type === 'rectangle') {
+        this.context.fillRect(shape.x, shape.y, shape.width, shape.height);
+        this.context.strokeRect(shape.x, shape.y, shape.width, shape.height);
+      } else if (shape.type === 'polygon' && shape.points.length) {
+        this.context.beginPath();
+        this.context.moveTo(shape.points[0].x, shape.points[0].y);
+        shape.points.slice(1).forEach((point) => this.context.lineTo(point.x, point.y));
+        this.context.closePath(); this.context.fill(); this.context.stroke();
+      }
       this.context.setLineDash([]);
       this.context.fillStyle = selected ? '#8b4b13' : '#3e398b';
       this.context.font = '10px sans-serif';
-      this.context.fillText(zone.name || zone.type, shape.x + 5, shape.y + 14);
+      const labelPoint = shape.type === 'rectangle' ? shape : shape.points[0];
+      this.context.fillText(zone.name || zone.type, labelPoint.x + 5, labelPoint.y + 14);
+      if (selected && shape.type === 'polygon') {
+        shape.points.forEach((point) => {
+          this.context.fillStyle = '#fff'; this.context.strokeStyle = '#e88e2f'; this.context.lineWidth = 2;
+          this.context.beginPath(); this.context.arc(point.x, point.y, 5, 0, Math.PI * 2); this.context.fill(); this.context.stroke();
+        });
+      }
     });
   }
 
   drawPreview() {
     const { start, end, erase, collision, blocked, zone } = this.preview;
     const { cellWidth, cellHeight } = this.state.grid;
+    if (this.preview.polygon) {
+      const points = [...this.preview.polygonPoints, this.preview.end];
+      if (!points.length) return;
+      this.context.fillStyle = 'rgba(91, 84, 196, 0.2)'; this.context.strokeStyle = '#5b54c4'; this.context.lineWidth = 2;
+      this.context.beginPath();
+      points.forEach((point, index) => {
+        const x = (point.x + 0.5) * cellWidth, y = (point.y + 0.5) * cellHeight;
+        if (index === 0) this.context.moveTo(x, y); else this.context.lineTo(x, y);
+      });
+      if (this.preview.polygonPoints.length >= 3) { this.context.closePath(); this.context.fill(); }
+      this.context.stroke();
+      this.preview.polygonPoints.forEach((point) => {
+        this.context.fillStyle = '#fff'; this.context.beginPath();
+        this.context.arc((point.x + 0.5) * cellWidth, (point.y + 0.5) * cellHeight, 4, 0, Math.PI * 2);
+        this.context.fill(); this.context.stroke();
+      });
+      return;
+    }
     const x = Math.min(start.x, end.x), y = Math.min(start.y, end.y);
     const width = Math.abs(start.x - end.x) + 1, height = Math.abs(start.y - end.y) + 1;
     this.context.fillStyle = zone ? 'rgba(91, 84, 196, 0.28)' : (collision ? (blocked ? 'rgba(180, 38, 32, 0.7)' : 'rgba(40, 190, 85, 0.7)') : (erase ? '#bd392a44' : '#d66a3244'));
