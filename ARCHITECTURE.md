@@ -47,3 +47,7 @@ Ouvrir ensuite `http://localhost:8000`. Le petit serveur est nécessaire au char
 ## Dimensions dynamiques
 
 Chaque projet porte sa propre configuration `state.grid` (`columns`, `rows`, `cellWidth`, `cellHeight`). Le renderer dimensionne le canvas à partir de cette configuration, les outils l’utilisent pour convertir les pointeurs en cases et l’adaptateur la conserve dans Pixel Map v1. Réduire une grille nécessite une confirmation si des données seraient rognées.
+
+## Collision indépendante
+
+`state.cells` décrit uniquement les surfaces graphiques du blueprint. `state.collisionCells` décrit les cases praticables de la couche logique, avec toutes les autres cases bloquées par défaut. L’outil Collision modifie uniquement cette seconde collection. L’adaptateur exporte et importe les deux couches séparément.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeGridResize, createMapState, normalizeGrid, resizeGrid } from '../src/map-state.js';
+import { analyzeGridResize, createMapState, normalizeGrid, paintCollisionRectangle, paintRectangle, resizeGrid } from '../src/map-state.js';
 import { projectToState, stateToDocument, stateToProject } from '../src/project-adapter.js';
 import { validatePixelMap, validatePixelMapProject } from '../src/pixel-map-format.js';
 
@@ -93,4 +93,36 @@ test('réduire une grille annonce les pertes avant de rogner', () => {
 
 test('les dimensions dépassant la capacité du canvas sont refusées', () => {
   assert.throws(() => normalizeGrid({ columns: 512, rows: 10, cellWidth: 32, cellHeight: 32 }), /canvas est limité/);
+});
+
+test('effacer le blueprint ne modifie pas la collision', () => {
+  const state = createMapState();
+  assert.equal(state.cells.has('3,3'), true);
+  assert.equal(state.collisionCells.has('3,3'), true);
+  paintRectangle(state, { x: 3, y: 3 }, { x: 3, y: 3 }, true);
+  assert.equal(state.cells.has('3,3'), false);
+  assert.equal(state.collisionCells.has('3,3'), true);
+});
+
+test('peindre une collision ne modifie pas le blueprint', () => {
+  const state = createMapState();
+  paintCollisionRectangle(state, { x: 3, y: 3 }, { x: 3, y: 3 }, true);
+  assert.equal(state.collisionCells.has('3,3'), false);
+  assert.equal(state.cells.has('3,3'), true);
+  paintCollisionRectangle(state, { x: 0, y: 0 }, { x: 0, y: 0 }, false);
+  assert.equal(state.collisionCells.has('0,0'), true);
+  assert.equal(state.cells.has('0,0'), false);
+});
+
+test('l’export et l’import conservent les collisions indépendantes', () => {
+  const source = createMapState();
+  paintCollisionRectangle(source, { x: 3, y: 3 }, { x: 3, y: 3 }, true);
+  paintCollisionRectangle(source, { x: 0, y: 0 }, { x: 0, y: 0 }, false);
+  const project = stateToProject(source);
+  const destination = createMapState();
+  projectToState(project, destination);
+  assert.equal(destination.cells.has('3,3'), true);
+  assert.equal(destination.collisionCells.has('3,3'), false);
+  assert.equal(destination.cells.has('0,0'), false);
+  assert.equal(destination.collisionCells.has('0,0'), true);
 });

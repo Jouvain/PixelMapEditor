@@ -22,13 +22,16 @@ function createInitialCells(grid) {
 
 export function createMapState(grid = DEFAULT_GRID) {
   const normalizedGrid = normalizeGrid(grid);
+  const initialCells = createInitialCells(normalizedGrid);
   return {
     projectName: 'Bureau — Étage 01',
     step: 1,
     activeTool: 'room',
+    collisionBrush: 'walkable',
     selectedAsset: 'desk',
     grid: normalizedGrid,
-    cells: createInitialCells(normalizedGrid),
+    cells: initialCells,
+    collisionCells: new Set(initialCells),
     doors: [{ x: 3, y: 10, side: 'left' }, { x: 19, y: 8, side: 'right' }]
       .filter((door) => door.x < normalizedGrid.columns && door.y < normalizedGrid.rows),
     objects: [],
@@ -59,6 +62,7 @@ export function analyzeGridResize(state, grid) {
   const next = normalizeGrid(grid);
   const outsideCell = (x, y) => x >= next.columns || y >= next.rows;
   const cells = [...state.cells].filter((key) => { const [x, y] = key.split(',').map(Number); return outsideCell(x, y); }).length;
+  const collisions = [...state.collisionCells].filter((key) => { const [x, y] = key.split(',').map(Number); return outsideCell(x, y); }).length;
   const doors = state.doors.filter((door) => outsideCell(door.x, door.y)).length;
   const objects = state.objects.filter((object) => outsideCell(object.x, object.y)).length;
   const width = next.columns * next.cellWidth, height = next.rows * next.cellHeight;
@@ -67,7 +71,7 @@ export function analyzeGridResize(state, grid) {
     if (shape.type === 'rectangle') return shape.x < 0 || shape.y < 0 || shape.x + shape.width > width || shape.y + shape.height > height;
     return shape.type === 'polygon' && shape.points?.some((point) => point.x < 0 || point.y < 0 || point.x > width || point.y > height);
   }).length;
-  return { grid: next, losses: { cells, doors, objects, zones }, totalLosses: cells + doors + objects + zones };
+  return { grid: next, losses: { cells, collisions, doors, objects, zones }, totalLosses: cells + collisions + doors + objects + zones };
 }
 
 export function resizeGrid(state, grid, allowCrop = false) {
@@ -75,6 +79,7 @@ export function resizeGrid(state, grid, allowCrop = false) {
   if (analysis.totalLosses && !allowCrop) return { resized: false, ...analysis };
   const outsideCell = (x, y) => x >= analysis.grid.columns || y >= analysis.grid.rows;
   state.cells = new Set([...state.cells].filter((key) => { const [x, y] = key.split(',').map(Number); return !outsideCell(x, y); }));
+  state.collisionCells = new Set([...state.collisionCells].filter((key) => { const [x, y] = key.split(',').map(Number); return !outsideCell(x, y); }));
   state.doors = state.doors.filter((door) => !outsideCell(door.x, door.y));
   state.objects = state.objects.filter((object) => !outsideCell(object.x, object.y));
   if (analysis.losses.zones) {
@@ -107,6 +112,18 @@ export function paintRectangle(state, start, end, erase = false) {
   state.doors = state.doors.filter((door) => hasCell(state, door.x, door.y));
 }
 
+export function paintCollisionRectangle(state, start, end, blocked = false) {
+  const left = Math.min(start.x, end.x);
+  const right = Math.max(start.x, end.x);
+  const top = Math.min(start.y, end.y);
+  const bottom = Math.max(start.y, end.y);
+  for (let y = top; y <= bottom; y += 1) {
+    for (let x = left; x <= right; x += 1) {
+      blocked ? state.collisionCells.delete(cellKey(x, y)) : state.collisionCells.add(cellKey(x, y));
+    }
+  }
+}
+
 export function toggleDoor(state, position) {
   if (!hasCell(state, position.x, position.y)) return 'outside';
   const sides = [];
@@ -132,7 +149,7 @@ export function placeOrRotateObject(state, position) {
 }
 
 export function toSerializable(state) {
-  return { ...state, cells: [...state.cells] };
+  return { ...state, cells: [...state.cells], collisionCells: [...state.collisionCells] };
 }
 
 export function applySerializable(state, data) {
@@ -140,6 +157,7 @@ export function applySerializable(state, data) {
     ...data,
     projectName: data.projectName ?? data.name ?? state.projectName,
     activeTool: data.activeTool ?? state.activeTool,
+    collisionBrush: data.collisionBrush ?? state.collisionBrush,
     selectedAsset: data.selectedAsset ?? state.selectedAsset,
     wallColor: data.wallColor ?? data.wall ?? state.wallColor,
     wallWidth: data.wallWidth ?? data.width ?? state.wallWidth,
@@ -148,6 +166,7 @@ export function applySerializable(state, data) {
   };
   Object.assign(state, normalized, {
     cells: new Set(data.cells || []),
+    collisionCells: new Set(data.collisionCells || data.cells || []),
     doors: data.doors || [],
     objects: data.objects || [],
     zones: data.zones || [],

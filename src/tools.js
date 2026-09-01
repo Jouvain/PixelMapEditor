@@ -1,4 +1,4 @@
-import { paintRectangle, placeOrRotateObject, toggleDoor } from './map-state.js';
+import { paintCollisionRectangle, paintRectangle, placeOrRotateObject, toggleDoor } from './map-state.js';
 
 export class ToolController {
   constructor({ canvas, state, renderer, history, onChange, onPosition, notify }) {
@@ -38,19 +38,31 @@ export class ToolController {
     if (this.state.activeTool === 'select') return;
     this.dragging = true; this.start = position;
     this.canvas.setPointerCapture(event.pointerId);
-    this.renderer.setPreview({ start: position, end: position, erase: this.state.activeTool === 'erase' });
+    this.renderer.setPreview({
+      start: position, end: position,
+      erase: this.state.activeTool === 'erase',
+      collision: this.state.activeTool === 'collision',
+      blocked: this.state.collisionBrush === 'blocked',
+    });
   }
 
   pointerMove(event) {
     const position = this.positionFromEvent(event);
     this.onPosition(position);
-    if (this.dragging) this.renderer.setPreview({ start: this.start, end: position, erase: this.state.activeTool === 'erase' });
+    if (this.dragging) this.renderer.setPreview({
+      start: this.start, end: position,
+      erase: this.state.activeTool === 'erase',
+      collision: this.state.activeTool === 'collision',
+      blocked: this.state.collisionBrush === 'blocked',
+    });
   }
 
   pointerUp(event) {
     if (!this.dragging) return;
     this.dragging = false;
-    paintRectangle(this.state, this.start, this.positionFromEvent(event), this.state.activeTool === 'erase');
+    const end = this.positionFromEvent(event);
+    if (this.state.activeTool === 'collision') paintCollisionRectangle(this.state, this.start, end, this.state.collisionBrush === 'blocked');
+    else paintRectangle(this.state, this.start, end, this.state.activeTool === 'erase');
     this.renderer.clearPreview();
     this.changed();
   }

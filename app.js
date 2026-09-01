@@ -29,6 +29,7 @@ function markDirty() { $('#saved').textContent = 'Modifié'; }
 function updateStats() {
   const count = state.cells.size;
   $('#cells').textContent = count;
+  $('#collisionCells').textContent = state.collisionCells.size;
   $('#area').textContent = `${Math.round(count * 1.2)} m²`;
   $('#doors').textContent = state.doors.length;
   $('#empty').hidden = count > 0;
@@ -51,6 +52,8 @@ function syncControls() {
   $$('.tool').forEach((button) => button.classList.toggle('on', button.dataset.tool === state.activeTool));
   $$('.swatch').forEach((button) => button.classList.toggle('on', button.dataset.color === state.wallColor));
   $$('.floor').forEach((button) => button.classList.toggle('on', button.dataset.floor === state.floor));
+  $('#collisionSettings').hidden = state.activeTool !== 'collision';
+  $$('[data-collision]').forEach((button) => button.classList.toggle('on', button.dataset.collision === state.collisionBrush));
   $('#width').value = state.wallWidth;
   $('#widthOut').textContent = `${state.wallWidth} px`;
   $('#grid').checked = state.showGrid;
@@ -92,6 +95,11 @@ $$('.tool').forEach((button) => button.addEventListener('click', () => {
   $$('.tool').forEach((item) => item.classList.remove('on'));
   button.classList.add('on');
   state.activeTool = button.dataset.tool;
+  syncControls(); renderer.draw();
+}));
+$$('[data-collision]').forEach((button) => button.addEventListener('click', () => {
+  state.collisionBrush = button.dataset.collision;
+  syncControls(); renderer.draw();
 }));
 $$('.step').forEach((button) => button.addEventListener('click', () => { state.step = Number(button.dataset.step); refresh(); }));
 $$('.swatch').forEach((button) => button.addEventListener('click', () => {
@@ -124,8 +132,8 @@ $('#applyDimensions').addEventListener('click', () => {
     };
     const analysis = analyzeGridResize(state, nextGrid);
     if (analysis.totalLosses) {
-      const { cells, doors, objects, zones } = analysis.losses;
-      if (!window.confirm(`Réduire la carte supprimera ${cells} case(s), ${doors} porte(s), ${objects} objet(s) et ${zones} zone(s). Continuer ?`)) { syncControls(); return; }
+      const { cells, collisions, doors, objects, zones } = analysis.losses;
+      if (!window.confirm(`Réduire la carte supprimera ${cells} case(s) graphiques, ${collisions} collision(s), ${doors} porte(s), ${objects} objet(s) et ${zones} zone(s). Continuer ?`)) { syncControls(); return; }
     }
     history.checkpoint();
     resizeGrid(state, nextGrid, true);
@@ -142,7 +150,13 @@ $('#save').addEventListener('click', () => {
   if (error) notify(error);
   else { $('#saved').textContent = 'Sauvegardé'; notify('Projet Pixel Map v1 sauvegardé'); }
 });
-$('#export').addEventListener('click', () => { exportPng(canvas, $('#name').value); notify('Export PNG généré'); });
+$('#export').addEventListener('click', () => {
+  const activeTool = state.activeTool;
+  if (activeTool === 'collision') { state.activeTool = 'select'; renderer.draw(); }
+  exportPng(canvas, $('#name').value);
+  if (activeTool === 'collision') { state.activeTool = activeTool; renderer.draw(); }
+  notify('Export PNG généré');
+});
 $('#exportJson').addEventListener('click', () => {
   state.projectName = $('#name').value;
   const error = firstValidationMessage(exportPixelMap(state));
@@ -180,7 +194,7 @@ $('#minus').addEventListener('click', () => setZoom(-0.1));
 $('#fit').addEventListener('click', () => { zoom = 1; setZoom(0); });
 document.addEventListener('keydown', (event) => {
   if (event.ctrlKey && event.key.toLowerCase() === 'z') $('#undo').click();
-  const shortcuts = { r: 'room', e: 'erase', d: 'door', v: 'select' };
+  const shortcuts = { r: 'room', e: 'erase', d: 'door', v: 'select', c: 'collision' };
   if (shortcuts[event.key.toLowerCase()] && !/input/i.test(event.target.tagName)) $(`[data-tool=${shortcuts[event.key.toLowerCase()]}]`).click();
 });
 

@@ -31,3 +31,45 @@
   font-size: 9px;
   font-weight: 700;
 }
+.collision-tool {
+  grid-column: 1 / -1;
+}
+.collision-settings {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #d4d2cb;
+  background: #fff;
+}
+.collision-settings > b,
+.collision-settings > small {
+  display: block;
+  color: #777;
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+.collision-settings > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin: 8px 0;
+}
+.collision-settings button {
+  padding: 7px 4px;
+  border: 1px solid #d4d2cb;
+  background: #f8f7f2;
+  font-size: 9px;
+}
+.collision-settings button.on {
+  border-color: #d66a32;
+  box-shadow: inset 0 0 0 1px #d66a32;
+}
+.collision-settings i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  background: #36b85c;
+}
+.collision-settings [data-collision="blocked"] i {
+  background: #b8362d;
+}

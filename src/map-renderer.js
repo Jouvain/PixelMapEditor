@@ -22,11 +22,24 @@ export class MapRenderer {
       const [x, y] = key.split(',').map(Number);
       this.drawFloorTile(x, y);
     });
+    if (state.step === 1 && state.activeTool === 'collision') this.drawCollisionOverlay();
     if (state.showGrid) this.drawGrid();
     this.drawWalls();
     this.drawDoors();
     if (state.step === 2) this.drawObjects();
     if (this.preview) this.drawPreview();
+  }
+
+  drawCollisionOverlay() {
+    const { context, canvas, state } = this;
+    const { cellWidth, cellHeight } = state.grid;
+    context.fillStyle = 'rgba(184, 54, 45, 0.2)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = 'rgba(54, 184, 92, 0.48)';
+    state.collisionCells.forEach((key) => {
+      const [x, y] = key.split(',').map(Number);
+      context.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+    });
   }
 
   resizeCanvas() {
@@ -113,13 +126,13 @@ export class MapRenderer {
   }
 
   drawPreview() {
-    const { start, end, erase } = this.preview;
+    const { start, end, erase, collision, blocked } = this.preview;
     const { cellWidth, cellHeight } = this.state.grid;
     const x = Math.min(start.x, end.x), y = Math.min(start.y, end.y);
     const width = Math.abs(start.x - end.x) + 1, height = Math.abs(start.y - end.y) + 1;
-    this.context.fillStyle = erase ? '#bd392a44' : '#d66a3244';
+    this.context.fillStyle = collision ? (blocked ? 'rgba(180, 38, 32, 0.7)' : 'rgba(40, 190, 85, 0.7)') : (erase ? '#bd392a44' : '#d66a3244');
     this.context.fillRect(x * cellWidth, y * cellHeight, width * cellWidth, height * cellHeight);
-    this.context.strokeStyle = '#d66a32'; this.context.lineWidth = 2;
+    this.context.strokeStyle = collision ? (blocked ? '#8f1f1b' : '#18743a') : '#d66a32'; this.context.lineWidth = 2;
     this.context.strokeRect(x * cellWidth, y * cellHeight, width * cellWidth, height * cellHeight);
   }
 }
