@@ -1,0 +1,9 @@
+{
+  "name": "pixel-map-editor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "check": "node --check app.js && node --check src/map-state.js && node --check src/assets.js && node --check src/map-renderer.js && node --check src/tools.js && node --check src/export.js"
+  }
+}

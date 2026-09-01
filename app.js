@@ -1,9 +1,138 @@
-(()=>{'use strict';const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],C=$('#map'),X=C.getContext('2d'),N=32,COLS=36,ROWS=24;const defs=[['desk','Bureau','work'],['chair','Chaise','work'],['computer','Ordinateur','work'],['shelf','Étagère','work'],['plant','Plante','nature'],['sofa','Canapé','nature'],['cabinet','Armoire','other'],['lamp','Lampe','other']];let cells=new Set,doors=[],objects=[],step=1,tool='room',floor='blue',wall='#deddd5',width=8,grid=true,asset='desk',drag=false,start,hover,zoom=1,history=[];
-for(let y=3;y<21;y++)for(let x=3;x<20;x++)cells.add(`${x},${y}`);for(let y=6;y<14;y++)for(let x=20;x<29;x++)cells.add(`${x},${y}`);for(let y=14;y<20;y++)for(let x=20;x<26;x++)cells.add(`${x},${y}`);doors=[{x:3,y:10,s:'l'},{x:19,y:8,s:'r'}];const has=(x,y)=>cells.has(`${x},${y}`),snap=()=>JSON.stringify({cells:[...cells],doors,objects,step,floor,wall,width,grid,name:$('#name').value}),checkpoint=()=>{history.push(snap());history=history.slice(-40)},dirty=()=>$('#saved').textContent='Modifié';function toast(t){$('#toast').textContent=t;$('#toast').classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>$('#toast').classList.remove('on'),1500)}function restore(s){let d=JSON.parse(s);cells=new Set(d.cells);doors=d.doors||[];objects=d.objects||[];floor=d.floor||'blue';wall=d.wall||wall;width=d.width||8;grid=d.grid!==false;$('#name').value=d.name||$('#name').value;setStep(d.step||1);draw()}
-function tile(x,y){let color=floor==='blue'?'#176f87':floor==='wood'?'#9f6038':'#b9b8b0';X.fillStyle=color;X.fillRect(x*N,y*N,N,N);X.fillStyle=floor==='blue'?'#0c5a7066':'#54351d44';if(floor==='blue')for(let a=5;a<N;a+=8)for(let b=5;b<N;b+=8)X.fillRect(x*N+a,y*N+b,2,2);else{X.fillRect(x*N,y*N+N-2,N,2);X.fillRect(x*N+(y%2?10:24),y*N,2,N)}}function line(a,b,c,d){X.lineCap='square';X.strokeStyle='#353b3e';X.lineWidth=width+5;X.beginPath();X.moveTo(a,b);X.lineTo(c,d);X.stroke();X.strokeStyle=wall;X.lineWidth=width;X.stroke();X.strokeStyle='#ffffff66';X.lineWidth=2;X.beginPath();X.moveTo(a,b-2);X.lineTo(c,d-2);X.stroke()}
-function sprite(c,t,x,y,z=.6,r=0){c.save();c.translate(x,y);c.rotate(r*Math.PI/2);c.scale(z,z);let q=(a,b,w,h,k)=>{c.fillStyle=k;c.fillRect(a,b,w,h)};if(t==='desk'){q(-42,-20,84,39,'#713d20');q(-38,-17,76,32,'#b96b36');q(-34,-6,68,3,'#dc9254');q(-34,19,7,20,'#33251f');q(27,19,7,20,'#33251f')}if(t==='chair'){q(-14,-12,28,26,'#142936');q(-10,-9,20,18,'#2d5062');q(-15,9,30,7,'#111c23')}if(t==='computer'){q(-17,-14,34,23,'#15232b');q(-12,-10,24,14,'#1798c1');q(-8,-7,16,7,'#42c3e1');q(-12,16,24,4,'#333')}if(t==='shelf'){q(-29,-15,58,30,'#3d2619');q(-25,-12,50,24,'#8e5430');for(let i=-18;i<22;i+=10)q(i,-8,6,16,['#cf7140','#d8b34f','#4c7780'][Math.abs(i)%3])}if(t==='plant'){q(-9,4,18,17,'#95502d');q(-6,7,12,11,'#c4713c');c.fillStyle='#38653f';for(let i=0;i<6;i++){c.beginPath();c.arc(Math.cos(i)*9,-3+Math.sin(i)*7,7,0,7);c.fill()}}if(t==='sofa'){q(-40,-14,80,29,'#304f54');q(-36,-11,72,23,'#4d7c78');q(-39,-17,8,32,'#233b3e');q(31,-17,8,32,'#233b3e')}if(t==='cabinet'){q(-29,-15,58,30,'#554031');q(-25,-12,50,24,'#aaa49a');q(0,-12,2,24,'#5d5e59')}if(t==='lamp'){q(-3,-3,6,21,'#373b3a');q(-12,16,24,5,'#252827');q(-13,-14,26,13,'#d3a74d')}c.restore()}
-function draw(){X.clearRect(0,0,C.width,C.height);X.fillStyle='#f8f7f2';X.fillRect(0,0,C.width,C.height);cells.forEach(k=>{let[x,y]=k.split(',').map(Number);tile(x,y)});if(grid){X.strokeStyle='#58606020';X.lineWidth=1;for(let x=0;x<=COLS;x++){X.beginPath();X.moveTo(x*N,0);X.lineTo(x*N,C.height);X.stroke()}for(let y=0;y<=ROWS;y++){X.beginPath();X.moveTo(0,y*N);X.lineTo(C.width,y*N);X.stroke()}}cells.forEach(k=>{let[x,y]=k.split(',').map(Number),l=x*N,t=y*N,r=l+N,b=t+N;if(!has(x,y-1))line(l,t,r,t);if(!has(x+1,y))line(r,t,r,b);if(!has(x,y+1))line(l,b,r,b);if(!has(x-1,y))line(l,t,l,b)});doors.forEach(d=>{let x=d.x*N,y=d.y*N;X.strokeStyle='#77421f';X.lineWidth=7;X.beginPath();if(d.s==='l'||d.s==='r'){let p=x+(d.s==='r'?N:0);X.moveTo(p,y+8);X.lineTo(p,y+N-8)}else{let p=y+(d.s==='b'?N:0);X.moveTo(x+8,p);X.lineTo(x+N-8,p)}X.stroke()});if(step===2)objects.forEach(o=>sprite(X,o.t,(o.x+.5)*N,(o.y+.5)*N,.58,o.r));if(drag&&start&&hover){let x=Math.min(start.x,hover.x),y=Math.min(start.y,hover.y),w=Math.abs(start.x-hover.x)+1,h=Math.abs(start.y-hover.y)+1;X.fillStyle=tool==='erase'?'#bd392a44':'#d66a3244';X.fillRect(x*N,y*N,w*N,h*N);X.strokeStyle='#d66a32';X.strokeRect(x*N,y*N,w*N,h*N)}stats()}
-function pos(e){let r=C.getBoundingClientRect();return{x:Math.max(0,Math.min(COLS-1,Math.floor((e.clientX-r.left)*C.width/r.width/N))),y:Math.max(0,Math.min(ROWS-1,Math.floor((e.clientY-r.top)*C.height/r.height/N)))}}function stats(){let n=cells.size;$('#cells').textContent=n;$('#area').textContent=Math.round(n*1.2)+' m²';$('#doors').textContent=doors.length;$('#empty').hidden=!!n;$('#rooms').textContent=n?'1 pièce':'0 pièce'}
-C.onpointerdown=e=>{let p=pos(e);checkpoint();if(step===2){if(!has(p.x,p.y))return toast('Placez l’objet dans le plan');let i=objects.findIndex(o=>Math.abs(o.x-p.x)<2&&Math.abs(o.y-p.y)<2);if(i>=0)objects[i].r=(objects[i].r+1)%4;else objects.push({t:asset,x:p.x,y:p.y,r:0});dirty();draw();return}if(tool==='door'){if(!has(p.x,p.y))return toast('Placez la porte sur une surface');let sides=[];if(!has(p.x-1,p.y))sides.push('l');if(!has(p.x+1,p.y))sides.push('r');if(!has(p.x,p.y-1))sides.push('t');if(!has(p.x,p.y+1))sides.push('b');if(!sides.length)return toast('Choisissez une cellule en bordure');let i=doors.findIndex(d=>d.x===p.x&&d.y===p.y);i>=0?doors.splice(i,1):doors.push({...p,s:sides[0]});dirty();draw();return}if(tool==='select')return;drag=true;start=hover=p;C.setPointerCapture(e.pointerId);draw()};C.onpointermove=e=>{hover=pos(e);$('#coords').innerHTML=`X: ${hover.x} &nbsp; Y: ${hover.y}`;if(drag)draw()};C.onpointerup=e=>{if(!drag)return;drag=false;let p=pos(e),x1=Math.min(start.x,p.x),x2=Math.max(start.x,p.x),y1=Math.min(start.y,p.y),y2=Math.max(start.y,p.y);for(let y=y1;y<=y2;y++)for(let x=x1;x<=x2;x++)tool==='erase'?cells.delete(`${x},${y}`):cells.add(`${x},${y}`);doors=doors.filter(d=>has(d.x,d.y));dirty();draw()};C.onpointerleave=()=>$('#coords').innerHTML='X: — &nbsp; Y: —';
-function setStep(n){step=n;$$('.step').forEach(b=>b.classList.toggle('on',+b.dataset.step===n));$('#build').hidden=n!==1;$('#dress').hidden=n===1;$('#summary').hidden=n!==1;$('#library').hidden=n===1;$('#mode').textContent=n===1?'MODE BLUEPRINT':'MODE HABILLAGE';$('#help').textContent=n===1?'Dessinez les surfaces, puis ajoutez des portes sur leurs contours.':'Choisissez un sol et placez du mobilier sur votre plan.';$('#next').textContent=n===1?'Continuer vers l’habillage →':'← Retour au blueprint';draw()}function assets(){let cat=$('.cats .on').dataset.cat,q=$('#search').value.toLowerCase();$('#assets').innerHTML='';defs.filter(a=>(cat==='all'||a[2]===cat)&&a[1].toLowerCase().includes(q)).forEach(a=>{let b=document.createElement('button'),c=document.createElement('canvas');c.width=96;c.height=70;sprite(c.getContext('2d'),a[0],48,35,.75);b.className=asset===a[0]?'on':'';b.append(c);b.insertAdjacentHTML('beforeend',`<b>${a[1]}</b>`);b.onclick=()=>{asset=a[0];assets()};$('#assets').append(b)})}
-$$('.tool').forEach(b=>b.onclick=()=>{$$('.tool').forEach(x=>x.classList.remove('on'));b.classList.add('on');tool=b.dataset.tool});$$('.step').forEach(b=>b.onclick=()=>setStep(+b.dataset.step));$$('.swatch').forEach(b=>b.onclick=()=>{wall=b.dataset.color;$$('.swatch').forEach(x=>x.classList.remove('on'));b.classList.add('on');dirty();draw()});$$('.floor').forEach(b=>b.onclick=()=>{floor=b.dataset.floor;$$('.floor').forEach(x=>x.classList.remove('on'));b.classList.add('on');dirty();draw()});$$('.cats button').forEach(b=>b.onclick=()=>{$$('.cats button').forEach(x=>x.classList.remove('on'));b.classList.add('on');assets()});$('#search').oninput=assets;$('#width').oninput=e=>{width=+e.target.value;$('#widthOut').textContent=width+' px';dirty();draw()};$('#grid').onchange=e=>{grid=e.target.checked;draw()};$('#next').onclick=()=>setStep(step===1?2:1);$('#undo').onclick=()=>{if(history.length)restore(history.pop())};$('#save').onclick=()=>{localStorage.setItem('pixel-map',snap());$('#saved').textContent='Sauvegardé';toast('Projet sauvegardé localement')};$('#export').onclick=()=>{let a=document.createElement('a');a.download='pixel-map.png';a.href=C.toDataURL();a.click();toast('Export PNG généré')};function z(v){zoom=Math.max(.6,Math.min(1.5,zoom+v));C.style.transform=`scale(${zoom})`;$('#zoom').textContent=Math.round(zoom*100)+'%'}$('#plus').onclick=()=>z(.1);$('#minus').onclick=()=>z(-.1);$('#fit').onclick=()=>{zoom=1;z(0)};$('#name').oninput=dirty;document.onkeydown=e=>{if(e.ctrlKey&&e.key==='z')$('#undo').click();let m={r:'room',e:'erase',d:'door',v:'select'};if(m[e.key]&&!/input/i.test(e.target.tagName))$(`[data-tool=${m[e.key]}]`).click()};let saved=localStorage.getItem('pixel-map');if(saved)restore(saved);setStep(step);assets();draw()})();
+import { ASSETS, drawSprite } from './src/assets.js';
+import { createHistory, createMapState } from './src/map-state.js';
+import { MapRenderer } from './src/map-renderer.js';
+import { ToolController } from './src/tools.js';
+import { exportPng, loadProject, saveProject } from './src/export.js';
+
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => [...document.querySelectorAll(selector)];
+const canvas = $('#map');
+const state = createMapState();
+loadProject(state);
+const history = createHistory(state);
+const renderer = new MapRenderer(canvas, state);
+let zoom = 1;
+
+function notify(message) {
+  const toast = $('#toast');
+  toast.textContent = message;
+  toast.classList.add('on');
+  clearTimeout(notify.timeout);
+  notify.timeout = setTimeout(() => toast.classList.remove('on'), 1500);
+}
+
+function markDirty() { $('#saved').textContent = 'Modifié'; }
+
+function updateStats() {
+  const count = state.cells.size;
+  $('#cells').textContent = count;
+  $('#area').textContent = `${Math.round(count * 1.2)} m²`;
+  $('#doors').textContent = state.doors.length;
+  $('#empty').hidden = count > 0;
+  $('#rooms').textContent = count ? '1 pièce' : '0 pièce';
+}
+
+function updateStep() {
+  const blueprint = state.step === 1;
+  $$('.step').forEach((button) => button.classList.toggle('on', Number(button.dataset.step) === state.step));
+  $('#build').hidden = !blueprint;
+  $('#dress').hidden = blueprint;
+  $('#summary').hidden = !blueprint;
+  $('#library').hidden = blueprint;
+  $('#mode').textContent = blueprint ? 'MODE BLUEPRINT' : 'MODE HABILLAGE';
+  $('#help').textContent = blueprint ? 'Dessinez les surfaces, puis ajoutez des portes sur leurs contours.' : 'Choisissez un sol et placez du mobilier sur votre plan.';
+  $('#next').textContent = blueprint ? 'Continuer vers l’habillage →' : '← Retour au blueprint';
+}
+
+function syncControls() {
+  $$('.tool').forEach((button) => button.classList.toggle('on', button.dataset.tool === state.activeTool));
+  $$('.swatch').forEach((button) => button.classList.toggle('on', button.dataset.color === state.wallColor));
+  $$('.floor').forEach((button) => button.classList.toggle('on', button.dataset.floor === state.floor));
+  $('#width').value = state.wallWidth;
+  $('#widthOut').textContent = `${state.wallWidth} px`;
+  $('#grid').checked = state.showGrid;
+}
+
+function refresh() { updateStep(); updateStats(); syncControls(); renderer.draw(); }
+
+function renderAssetLibrary() {
+  const category = $('.cats .on').dataset.cat;
+  const query = $('#search').value.toLowerCase();
+  $('#assets').replaceChildren();
+  ASSETS.filter((item) => (category === 'all' || item.category === category) && item.name.toLowerCase().includes(query))
+    .forEach((item) => {
+      const button = document.createElement('button');
+      const preview = document.createElement('canvas');
+      preview.width = 96; preview.height = 70;
+      drawSprite(preview.getContext('2d'), item.id, 48, 35, 0.75);
+      button.classList.toggle('on', state.selectedAsset === item.id);
+      button.append(preview);
+      button.insertAdjacentHTML('beforeend', `<b>${item.name}</b>`);
+      button.addEventListener('click', () => { state.selectedAsset = item.id; renderAssetLibrary(); });
+      $('#assets').append(button);
+    });
+}
+
+new ToolController({
+  canvas, state, renderer, history,
+  onChange: () => { markDirty(); updateStats(); },
+  onPosition: (position) => { $('#coords').innerHTML = position ? `X: ${position.x} &nbsp; Y: ${position.y}` : 'X: — &nbsp; Y: —'; },
+  notify,
+});
+
+$$('.tool').forEach((button) => button.addEventListener('click', () => {
+  $$('.tool').forEach((item) => item.classList.remove('on'));
+  button.classList.add('on');
+  state.activeTool = button.dataset.tool;
+}));
+$$('.step').forEach((button) => button.addEventListener('click', () => { state.step = Number(button.dataset.step); refresh(); }));
+$$('.swatch').forEach((button) => button.addEventListener('click', () => {
+  state.wallColor = button.dataset.color;
+  $$('.swatch').forEach((item) => item.classList.remove('on'));
+  button.classList.add('on'); markDirty(); renderer.draw();
+}));
+$$('.floor').forEach((button) => button.addEventListener('click', () => {
+  state.floor = button.dataset.floor;
+  $$('.floor').forEach((item) => item.classList.remove('on'));
+  button.classList.add('on'); markDirty(); renderer.draw();
+}));
+$$('.cats button').forEach((button) => button.addEventListener('click', () => {
+  $$('.cats button').forEach((item) => item.classList.remove('on'));
+  button.classList.add('on'); renderAssetLibrary();
+}));
+
+$('#search').addEventListener('input', renderAssetLibrary);
+$('#width').addEventListener('input', (event) => {
+  state.wallWidth = Number(event.target.value);
+  $('#widthOut').textContent = `${state.wallWidth} px`;
+  markDirty(); renderer.draw();
+});
+$('#grid').addEventListener('change', (event) => { state.showGrid = event.target.checked; renderer.draw(); });
+$('#next').addEventListener('click', () => { state.step = state.step === 1 ? 2 : 1; refresh(); });
+$('#undo').addEventListener('click', () => { if (history.undo()) { markDirty(); refresh(); } });
+$('#save').addEventListener('click', () => {
+  state.projectName = $('#name').value;
+  saveProject(state); $('#saved').textContent = 'Sauvegardé'; notify('Projet sauvegardé localement');
+});
+$('#export').addEventListener('click', () => { exportPng(canvas, $('#name').value); notify('Export PNG généré'); });
+$('#name').addEventListener('input', (event) => { state.projectName = event.target.value; markDirty(); });
+
+function setZoom(change) {
+  zoom = Math.max(0.6, Math.min(1.5, zoom + change));
+  canvas.style.transform = `scale(${zoom})`;
+  $('#zoom').textContent = `${Math.round(zoom * 100)}%`;
+}
+$('#plus').addEventListener('click', () => setZoom(0.1));
+$('#minus').addEventListener('click', () => setZoom(-0.1));
+$('#fit').addEventListener('click', () => { zoom = 1; setZoom(0); });
+document.addEventListener('keydown', (event) => {
+  if (event.ctrlKey && event.key.toLowerCase() === 'z') $('#undo').click();
+  const shortcuts = { r: 'room', e: 'erase', d: 'door', v: 'select' };
+  if (shortcuts[event.key.toLowerCase()] && !/input/i.test(event.target.tagName)) $(`[data-tool=${shortcuts[event.key.toLowerCase()]}]`).click();
+});
+
+$('#name').value = state.projectName;
+$('#width').value = state.wallWidth;
+$('#grid').checked = state.showGrid;
+renderAssetLibrary();
+refresh();
