@@ -10,6 +10,7 @@ import {
   exportPixelMap, exportPng, exportProject, firstValidationMessage,
   importProjectFile, loadProject, saveProject,
 } from './src/export.js';
+import { createUnsavedChangesTracker } from './src/unsaved-changes.js';
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -19,8 +20,8 @@ const loadedProject = loadProject(state);
 const history = createHistory(state);
 const renderer = new MapRenderer(canvas, state);
 let zoom = loadedProject.zoom || 1;
-let dirty = false;
-if (!loadedProject.loaded) $('#saved').textContent = 'Nouveau';
+const unsavedChanges = createUnsavedChangesTracker({ onStatus: (status) => { $('#saved').textContent = status; } });
+unsavedChanges.markClean(loadedProject.loaded ? 'Sauvegardé' : 'Nouveau');
 
 function notify(message) {
   const toast = $('#toast');
@@ -30,7 +31,7 @@ function notify(message) {
   notify.timeout = setTimeout(() => toast.classList.remove('on'), 1500);
 }
 
-function markDirty() { dirty = true; $('#saved').textContent = 'Modifié'; }
+function markDirty() { unsavedChanges.markModified(); }
 
 function updateStats() {
   const count = state.cells.size;
@@ -261,7 +262,7 @@ $('#save').addEventListener('click', () => {
   const validation = saveProject(state, zoom);
   const error = firstValidationMessage(validation);
   if (error) notify(error);
-  else { dirty = false; $('#saved').textContent = 'Sauvegardé'; notify('Projet Pixel Map v1 sauvegardé'); }
+  else { unsavedChanges.markClean(); notify('Projet Pixel Map v1 sauvegardé'); }
 });
 $('#export').addEventListener('click', () => {
   renderer.draw({ editorOverlays: false });
@@ -283,6 +284,7 @@ $('#importProject').addEventListener('click', () => $('#projectFile').click());
 $('#projectFile').addEventListener('change', async (event) => {
   const [file] = event.target.files;
   if (!file) return;
+  if (!unsavedChanges.confirmDiscard((message) => window.confirm(message))) { event.target.value = ''; return; }
   try {
     const result = await importProjectFile(file, state);
     const error = firstValidationMessage(result.validation);
@@ -298,7 +300,7 @@ $('#name').addEventListener('input', (event) => { state.projectName = event.targ
 
 const newProjectDialog = $('#newProjectDialog');
 $('#newProject').addEventListener('click', () => {
-  if (dirty && !window.confirm('Les modifications non sauvegardées seront abandonnées. Continuer ?')) return;
+  if (!unsavedChanges.confirmDiscard((message) => window.confirm(message))) return;
   $('#newProjectName').value = 'Nouvelle carte';
   $('#newColumns').value = state.grid.columns;
   $('#newRows').value = state.grid.rows;
@@ -321,15 +323,12 @@ $('#newProjectForm').addEventListener('submit', (event) => {
     applySerializable(state, toSerializable(next));
     history.clear(); toolController.cancelPolygon();
     zoom = 1; setZoom(0); $('#name').value = state.projectName;
-    dirty = true; $('#saved').textContent = 'Nouveau';
+    unsavedChanges.markModified('Nouveau');
     newProjectDialog.close(); renderAssetLibrary(); refresh();
     notify(`Projet « ${state.projectName} » créé`);
   } catch (error) { notify(error.message); }
 });
-window.addEventListener('beforeunload', (event) => {
-  if (!dirty) return;
-  event.preventDefault(); event.returnValue = '';
-});
+window.addEventListener('beforeunload', (event) => unsavedChanges.handleBeforeUnload(event));
 
 function setZoom(change) {
   zoom = Math.max(0.6, Math.min(1.5, zoom + change));

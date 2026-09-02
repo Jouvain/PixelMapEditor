@@ -85,3 +85,7 @@ Le presse-papiers Blueprint est interne au projet en cours et stocke les cellule
 ## Nouveau projet
 
 Sans sauvegarde locale, l’application démarre sur une carte vide. La commande Nouveau ouvre un dialogue pour choisir le nom, la grille logique et un modèle (`empty` ou `demo`). Elle demande confirmation si l’état courant contient des modifications non sauvegardées, remplace entièrement l’état et vide l’historique afin qu’une annulation ne puisse pas restaurer le projet abandonné.
+
+## Modifications non sauvegardées
+
+`unsaved-changes.js` centralise l’état propre/modifié et le libellé affiché. Un remplacement par Nouveau ou Importer passe par la même confirmation. L’événement navigateur `beforeunload` est armé uniquement quand cet état est modifié, ce qui protège le rechargement, la navigation et la fermeture de l’onglet sans afficher d’avertissement après une sauvegarde réussie.
