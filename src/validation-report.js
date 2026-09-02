@@ -13,8 +13,8 @@ export function validationIssueTarget(issue, document) {
   let match = /^objects\[(\d+)\]/.exec(path);
   if (match) {
     const object = document.objects?.[Number(match[1])];
-    if (!object || object.type === 'architecture.door') return null;
-    return { kind: 'object', id: object.id };
+    if (!object) return null;
+    return object.type === 'architecture.door' ? { kind: 'door', id: object.id } : { kind: 'object', id: object.id };
   }
   match = /^zones\[(\d+)\]/.exec(path);
   if (match) {

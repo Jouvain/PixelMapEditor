@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addPolygonVertex, analyzeGridResize, applySerializable, changeObjectOrder, copyBlueprintSelection, createHistory, createMapState, createPolygonZone,
-  createRectangleZone, deleteBlueprintSelection, deletePolygonVertex, deleteSelectedEntity, duplicateBlueprintSelection,
-  moveBlueprintSelection, moveObject, normalizeGrid, objectPosition, paintCollisionRectangle, paintRectangle,
+  applyDoorCollision, createRectangleZone, deleteBlueprintSelection, deletePolygonVertex, deleteSelectedDoor, deleteSelectedEntity, duplicateBlueprintSelection,
+  getSelectedDoor, moveBlueprintSelection, moveDoor, moveObject, normalizeGrid, objectPosition, paintCollisionRectangle, paintRectangle,
   pasteBlueprintSelection, placeGenericObject, polygonSelfIntersects, resizeGrid, resizeRectangleZone,
-  selectBlueprintRectangle, selectEntityAt, translateZone,
+  selectBlueprintRectangle, selectEntityAt, toggleDoor, translateZone, updateDoor, validDoorSides,
 } from '../src/map-state.js';
 import { projectToState, stateToDocument, stateToProject } from '../src/project-adapter.js';
 import { validatePixelMap, validatePixelMapProject } from '../src/pixel-map-format.js';
@@ -419,4 +419,43 @@ test('réinitialiser un projet permet de vider son historique', () => {
   history.clear();
   assert.equal(history.undo(), false);
   assert.equal(state.projectName, 'Vide');
+});
+
+test('une porte peut être sélectionnée, orientée, déplacée et supprimée', () => {
+  const state = createMapState({ columns: 6, rows: 6, cellWidth: 16, cellHeight: 16 }, { template: 'empty' });
+  state.cells = new Set(['1,1', '2,1', '3,3']);
+  assert.equal(toggleDoor(state, { x: 1, y: 1 }), 'ok');
+  const door = getSelectedDoor(state);
+  assert.ok(door.id);
+  assert.equal(toggleDoor(state, { x: 1, y: 1 }), 'selected');
+  assert.deepEqual(validDoorSides(state, { x: 1, y: 1 }).sort(), ['bottom', 'left', 'top']);
+  assert.equal(updateDoor(state, door, { x: 1, y: 1, side: 'bottom', name: 'Entrée', properties: { locked: false, collisionPolicy: 'walkable' } }), true);
+  assert.equal(state.collisionCells.has('1,1'), true);
+  assert.equal(moveDoor(state, door, { x: 3, y: 3 }, 'right'), true);
+  assert.deepEqual({ x: door.x, y: door.y, side: door.side }, { x: 3, y: 3, side: 'right' });
+  assert.equal(deleteSelectedDoor(state), true);
+  assert.equal(state.doors.length, 0);
+});
+
+test('la politique statique d’une porte peut bloquer, libérer ou préserver une collision', () => {
+  const state = createMapState({ columns: 4, rows: 4, cellWidth: 16, cellHeight: 16 }, { template: 'empty' });
+  state.cells.add('1,1');
+  const door = { id: 'door-policy', x: 1, y: 1, side: 'top', properties: { collisionPolicy: 'walkable' } };
+  applyDoorCollision(state, door); assert.equal(state.collisionCells.has('1,1'), true);
+  door.properties.collisionPolicy = 'blocked'; applyDoorCollision(state, door); assert.equal(state.collisionCells.has('1,1'), false);
+  door.properties.collisionPolicy = 'unchanged'; state.collisionCells.add('1,1'); applyDoorCollision(state, door);
+  assert.equal(state.collisionCells.has('1,1'), true);
+});
+
+test('le nom et les métadonnées d’une porte font un aller-retour Pixel Map', () => {
+  const source = createMapState({ columns: 4, rows: 4, cellWidth: 16, cellHeight: 16 }, { template: 'empty' });
+  source.cells.add('1,1');
+  source.doors.push({ id: 'door-main', x: 1, y: 1, side: 'left', name: 'Entrée principale', properties: { collisionPolicy: 'blocked', access: 'staff' } });
+  const project = stateToProject(source);
+  const exported = project.document.objects.find((object) => object.id === 'door-main');
+  assert.equal(exported.name, 'Entrée principale');
+  assert.equal(exported.properties.collisionPolicy, 'blocked');
+  const destination = createMapState(); projectToState(project, destination);
+  assert.equal(destination.doors[0].name, 'Entrée principale');
+  assert.deepEqual(destination.doors[0].properties, exported.properties);
 });

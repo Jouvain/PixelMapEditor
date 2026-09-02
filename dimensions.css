@@ -120,6 +120,7 @@
   font-weight: 700;
 }
 .entity-inspector input,
+.entity-inspector select,
 .entity-inspector textarea {
   width: 100%;
   padding: 8px;
@@ -137,6 +138,7 @@
   font-weight: 700;
 }
 #deleteEntity { color: #a52f28; }
+#deleteDoor { color: #a52f28; }
 .zone-shape-settings {
   margin: 10px 0 18px;
   padding: 10px;

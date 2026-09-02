@@ -99,12 +99,15 @@ export function stateToDocument(state) {
   const exportedDoors = state.doors.map((door, index) => {
     const id = door.id || `door-${String(index + 1).padStart(4, '0')}`;
     const existing = clone(sourceObjects.get(id) || {});
-    return {
+    const exported = {
       ...existing, id, type: 'architecture.door',
       position: { x: (door.x + 0.5) * cellWidth, y: (door.y + 0.5) * cellHeight },
       rotation: ['top', 'right', 'bottom', 'left'].indexOf(door.side) * 90,
       properties: { ...(existing.properties || {}), ...(door.properties || {}), gridX: door.x, gridY: door.y, side: door.side },
     };
+    if (door.name) exported.name = door.name;
+    else delete exported.name;
+    return exported;
   });
   document.objects = [...exportedObjects, ...exportedDoors];
   document.zones = (state.zones || []).map(clone);
@@ -139,6 +142,7 @@ export function projectToState(project, state) {
   document.collision.cells.forEach((cell) => cell.blocked ? collisionCells.delete(keyOf(cell)) : collisionCells.add(keyOf(cell)));
   const doors = document.objects.filter((object) => object.type === 'architecture.door').map((object) => ({
     id: object.id,
+    name: object.name || '',
     x: object.properties.gridX ?? Math.floor(object.position.x / grid.cellWidth),
     y: object.properties.gridY ?? Math.floor(object.position.y / grid.cellHeight),
     side: object.properties.side ?? ['top', 'right', 'bottom', 'left'][Math.round((object.rotation || 0) / 90) % 4],

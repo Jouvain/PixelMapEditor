@@ -1,8 +1,9 @@
 import { ASSETS, drawSprite } from './src/assets.js';
 import {
   addPolygonVertex, analyzeGridResize, changeObjectOrder, copyBlueprintSelection, createHistory, createMapState,
-  deleteBlueprintSelection, deletePolygonVertex, deleteSelectedEntity, duplicateBlueprintSelection, getSelectedEntity,
-  moveObject, objectPosition, pasteBlueprintSelection, polygonSelfIntersects, resizeGrid, applySerializable, toSerializable,
+  deleteBlueprintSelection, deletePolygonVertex, deleteSelectedDoor, deleteSelectedEntity, duplicateBlueprintSelection,
+  getSelectedDoor, getSelectedEntity, moveObject, objectPosition, pasteBlueprintSelection, polygonSelfIntersects,
+  resizeGrid, applySerializable, toSerializable, updateDoor,
 } from './src/map-state.js';
 import { MapRenderer } from './src/map-renderer.js';
 import { ToolController } from './src/tools.js';
@@ -40,6 +41,9 @@ function focusValidationTarget(target) {
     const collection = target.kind === 'object' ? state.objects : state.zones;
     if (!collection.some((item) => item.id === target.id)) return false;
     state.step = 2; state.entityTool = 'select'; state.selectedEntity = { kind: target.kind, id: target.id };
+  } else if (target.kind === 'door') {
+    if (!state.doors.some((door) => door.id === target.id)) return false;
+    state.step = 1; state.activeTool = 'door'; state.selectedDoorId = target.id;
   } else if (target.kind === 'collision') {
     state.step = 1; state.activeTool = 'collision';
   } else if (target.kind === 'blueprint') {
@@ -139,7 +143,18 @@ function syncControls() {
   $('#mapResolution').textContent = `${state.grid.columns * state.grid.cellWidth} × ${state.grid.rows * state.grid.cellHeight}`;
 }
 
-function refresh() { updateStep(); updateStats(); syncControls(); renderer.draw(); renderInspector(); }
+function refresh() { updateStep(); updateStats(); syncControls(); renderer.draw(); renderInspector(); renderDoorInspector(); }
+
+function renderDoorInspector() {
+  const door = getSelectedDoor(state);
+  $('#doorInspector').hidden = !door || state.step !== 1 || state.activeTool !== 'door';
+  if (!door) return;
+  $('#doorId').textContent = door.id;
+  $('#doorName').value = door.name || '';
+  $('#doorX').value = door.x; $('#doorY').value = door.y; $('#doorSide').value = door.side;
+  $('#doorCollision').value = door.properties?.collisionPolicy || 'unchanged';
+  $('#doorProperties').value = JSON.stringify(door.properties || {}, null, 2);
+}
 
 function renderInspector() {
   const entity = getSelectedEntity(state);
@@ -185,7 +200,7 @@ const toolController = new ToolController({
   canvas, state, renderer, history,
   onChange: () => { markDirty(); updateStats(); },
   onPosition: (position) => { $('#coords').innerHTML = position ? `X: ${position.x} &nbsp; Y: ${position.y}` : 'X: — &nbsp; Y: —'; },
-  onSelection: renderInspector,
+  onSelection: () => { renderInspector(); renderDoorInspector(); },
   notify,
 });
 
@@ -193,7 +208,7 @@ $$('.tool').forEach((button) => button.addEventListener('click', () => {
   $$('.tool').forEach((item) => item.classList.remove('on'));
   button.classList.add('on');
   state.activeTool = button.dataset.tool;
-  syncControls(); renderer.draw();
+  syncControls(); renderer.draw(); renderDoorInspector();
 }));
 $$('[data-collision]').forEach((button) => button.addEventListener('click', () => {
   state.collisionBrush = button.dataset.collision;
@@ -269,6 +284,26 @@ $('#deleteEntity').addEventListener('click', () => {
   if (!getSelectedEntity(state)) return;
   history.checkpoint(); deleteSelectedEntity(state);
   markDirty(); renderer.draw(); renderInspector(); notify('Entité supprimée');
+});
+$('#applyDoor').addEventListener('click', () => {
+  const door = getSelectedDoor(state);
+  if (!door) return;
+  try {
+    const properties = JSON.parse($('#doorProperties').value || '{}');
+    if (!properties || Array.isArray(properties) || typeof properties !== 'object') throw new Error('Les métadonnées doivent être un objet JSON.');
+    properties.collisionPolicy = $('#doorCollision').value;
+    history.checkpoint();
+    if (!updateDoor(state, door, {
+      x: Number($('#doorX').value), y: Number($('#doorY').value), side: $('#doorSide').value,
+      name: $('#doorName').value.trim(), properties,
+    })) throw new Error('La porte doit rester sur un côté extérieur d’une cellule du Blueprint.');
+    markDirty(); updateStats(); renderer.draw(); renderDoorInspector(); notify('Porte mise à jour');
+  } catch (error) { notify(error.message); }
+});
+$('#deleteDoor').addEventListener('click', () => {
+  if (!getSelectedDoor(state)) return;
+  history.checkpoint(); deleteSelectedDoor(state);
+  markDirty(); updateStats(); renderer.draw(); renderDoorInspector(); notify('Porte supprimée');
 });
 $$('.step').forEach((button) => button.addEventListener('click', () => { state.step = Number(button.dataset.step); refresh(); }));
 $$('.swatch').forEach((button) => button.addEventListener('click', () => {

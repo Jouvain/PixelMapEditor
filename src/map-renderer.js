@@ -106,8 +106,12 @@ export class MapRenderer {
   drawDoors() {
     const { context } = this;
     const { cellWidth, cellHeight } = this.state.grid;
-    this.state.doors.forEach(({ x, y, side }) => {
+    this.state.doors.forEach(({ id, x, y, side }) => {
       const left = x * cellWidth, top = y * cellHeight;
+      if (this.state.activeTool === 'door' && this.state.selectedDoorId === id) {
+        context.fillStyle = 'rgba(214, 106, 50, 0.22)'; context.fillRect(left, top, cellWidth, cellHeight);
+        context.strokeStyle = '#d66a32'; context.lineWidth = 2; context.strokeRect(left + 2, top + 2, cellWidth - 4, cellHeight - 4);
+      }
       context.strokeStyle = '#77421f'; context.lineWidth = 7; context.beginPath();
       if (side === 'left' || side === 'right') {
         const position = left + (side === 'right' ? cellWidth : 0);

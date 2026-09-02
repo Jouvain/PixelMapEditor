@@ -37,12 +37,13 @@ export function createMapState(grid = DEFAULT_GRID, { template = 'demo', project
     objectSnapToGrid: true,
     zoneShape: 'rectangle',
     selectedEntity: null,
+    selectedDoorId: null,
     selectedZoneVertex: null,
     selectedAsset: 'desk',
     grid: normalizedGrid,
     cells: initialCells,
     collisionCells: new Set(initialCells),
-    doors: template === 'demo' ? [{ x: 3, y: 10, side: 'left' }, { x: 19, y: 8, side: 'right' }]
+    doors: template === 'demo' ? [{ id: 'demo-door-1', x: 3, y: 10, side: 'left', name: '', properties: { collisionPolicy: 'unchanged' } }, { id: 'demo-door-2', x: 19, y: 8, side: 'right', name: '', properties: { collisionPolicy: 'unchanged' } }]
       .filter((door) => door.x < normalizedGrid.columns && door.y < normalizedGrid.rows) : [],
     objects: [],
     zones: [],
@@ -218,17 +219,59 @@ export function duplicateBlueprintSelection(state) {
 
 export function toggleDoor(state, position) {
   if (!hasCell(state, position.x, position.y)) return 'outside';
+  const existing = state.doors.find((door) => door.x === position.x && door.y === position.y);
+  if (existing) { state.selectedDoorId = existing.id; return 'selected'; }
+  const sides = validDoorSides(state, position);
+  if (!sides.length) return 'not-on-edge';
+  const door = { id: crypto.randomUUID(), ...position, side: sides[0], name: '', properties: { collisionPolicy: 'unchanged' } };
+  state.doors.push(door); state.selectedDoorId = door.id;
+  return 'ok';
+}
+
+export function validDoorSides(state, position) {
+  if (!hasCell(state, position.x, position.y)) return [];
   const sides = [];
   if (!hasCell(state, position.x - 1, position.y)) sides.push('left');
   if (!hasCell(state, position.x + 1, position.y)) sides.push('right');
   if (!hasCell(state, position.x, position.y - 1)) sides.push('top');
   if (!hasCell(state, position.x, position.y + 1)) sides.push('bottom');
-  if (!sides.length) return 'not-on-edge';
+  return sides;
+}
 
-  const index = state.doors.findIndex((door) => door.x === position.x && door.y === position.y);
-  if (index >= 0) state.doors.splice(index, 1);
-  else state.doors.push({ ...position, side: sides[0] });
-  return 'ok';
+export function getSelectedDoor(state) {
+  return state.doors.find((door) => door.id === state.selectedDoorId) || null;
+}
+
+export function applyDoorCollision(state, door) {
+  const policy = door.properties?.collisionPolicy || 'unchanged';
+  if (policy === 'walkable') state.collisionCells.add(cellKey(door.x, door.y));
+  else if (policy === 'blocked') state.collisionCells.delete(cellKey(door.x, door.y));
+  return policy !== 'unchanged';
+}
+
+export function moveDoor(state, door, position, preferredSide = door.side) {
+  const sides = validDoorSides(state, position);
+  if (!sides.length) return false;
+  door.x = position.x; door.y = position.y;
+  door.side = sides.includes(preferredSide) ? preferredSide : sides[0];
+  applyDoorCollision(state, door);
+  return true;
+}
+
+export function updateDoor(state, door, { x, y, side, name, properties }) {
+  const position = { x: Number(x), y: Number(y) };
+  const sides = validDoorSides(state, position);
+  if (!sides.includes(side)) return false;
+  Object.assign(door, { ...position, side, name: name || '', properties: structuredClone(properties || {}) });
+  applyDoorCollision(state, door);
+  return true;
+}
+
+export function deleteSelectedDoor(state) {
+  const index = state.doors.findIndex((door) => door.id === state.selectedDoorId);
+  if (index < 0) return false;
+  state.doors.splice(index, 1); state.selectedDoorId = null;
+  return true;
 }
 
 export function placeOrRotateObject(state, position) {
@@ -434,6 +477,7 @@ export function applySerializable(state, data) {
     objectSnapToGrid: data.objectSnapToGrid ?? state.objectSnapToGrid,
     zoneShape: data.zoneShape ?? state.zoneShape,
     selectedEntity: data.selectedEntity ?? null,
+    selectedDoorId: data.selectedDoorId ?? null,
     selectedZoneVertex: data.selectedZoneVertex ?? null,
     selectedAsset: data.selectedAsset ?? state.selectedAsset,
     wallColor: data.wallColor ?? data.wall ?? state.wallColor,
@@ -450,7 +494,11 @@ export function applySerializable(state, data) {
     zones: data.zones || [],
   });
   // Compatibilité avec les sauvegardes de la première version.
-  state.doors.forEach((door) => { door.side ||= door.s; });
+  state.doors.forEach((door, index) => {
+    door.id ||= `door-${String(index + 1).padStart(4, '0')}`;
+    door.side ||= door.s; door.name ??= ''; door.properties ??= {};
+    door.properties.collisionPolicy ||= 'unchanged';
+  });
   state.objects.forEach((object) => {
     object.type ||= object.t;
     if (object.assetId === undefined) object.assetId = object.type;

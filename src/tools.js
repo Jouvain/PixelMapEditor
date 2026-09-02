@@ -1,5 +1,5 @@
 import {
-  createPolygonZone, createRectangleZone, getSelectedEntity, moveBlueprintSelection, moveObject, objectPosition, paintCollisionRectangle, paintRectangle,
+  createPolygonZone, createRectangleZone, getSelectedEntity, moveBlueprintSelection, moveDoor, moveObject, objectPosition, paintCollisionRectangle, paintRectangle,
   placeGenericObject, placeOrRotateObject, polygonSelfIntersects, resizeRectangleZone, selectEntityAt, toggleDoor, translateZone,
   selectBlueprintRectangle,
 } from './map-state.js';
@@ -15,6 +15,7 @@ export class ToolController {
     this.zoneDrag = null;
     this.rectangleDrag = null;
     this.blueprintDrag = null;
+    this.doorDrag = null;
     canvas.addEventListener('pointerdown', (event) => this.pointerDown(event));
     canvas.addEventListener('pointermove', (event) => this.pointerMove(event));
     canvas.addEventListener('pointerup', (event) => this.pointerUp(event));
@@ -115,10 +116,16 @@ export class ToolController {
       return;
     }
     if (this.state.activeTool === 'door') {
+      const door = this.state.doors.find((item) => item.x === position.x && item.y === position.y);
+      if (door) {
+        this.state.selectedDoorId = door.id;
+        this.doorDrag = { door, moved: false }; this.dragging = true;
+        this.canvas.setPointerCapture(event.pointerId); this.renderer.draw(); this.onSelection(); return;
+      }
       const result = toggleDoor(this.state, position);
       if (result === 'outside') this.notify('Placez la porte sur une surface');
       else if (result === 'not-on-edge') this.notify('Choisissez une cellule en bordure');
-      else this.changed();
+      else { this.changed(); this.onSelection(); }
       return;
     }
     if (this.state.activeTool === 'select') {
@@ -144,6 +151,11 @@ export class ToolController {
     if (this.vertexDrag) {
       this.vertexDrag.zone.shape.points[this.vertexDrag.index] = this.logicalPositionFromEvent(event);
       this.vertexDrag.moved = true; this.renderer.draw(); this.onSelection();
+    } else if (this.doorDrag) {
+      const before = `${this.doorDrag.door.x},${this.doorDrag.door.y},${this.doorDrag.door.side}`;
+      moveDoor(this.state, this.doorDrag.door, position);
+      this.doorDrag.moved ||= before !== `${this.doorDrag.door.x},${this.doorDrag.door.y},${this.doorDrag.door.side}`;
+      this.renderer.draw(); this.onSelection();
     } else if (this.rectangleDrag) {
       resizeRectangleZone(this.state, this.rectangleDrag.zone, this.rectangleDrag.handle, this.logicalPositionFromEvent(event));
       this.rectangleDrag.moved = true; this.renderer.draw(); this.onSelection();
@@ -170,6 +182,10 @@ export class ToolController {
   pointerUp(event) {
     if (!this.dragging) return;
     this.dragging = false;
+    if (this.doorDrag) {
+      const moved = this.doorDrag.moved; this.doorDrag = null;
+      if (moved) this.changed(); this.onSelection(); return;
+    }
     if (this.rectangleDrag) {
       const moved = this.rectangleDrag.moved; this.rectangleDrag = null;
       if (moved) this.changed(); this.onSelection(); return;

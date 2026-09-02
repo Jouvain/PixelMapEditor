@@ -20,7 +20,7 @@ test('le rapport compte tous les niveaux de validation', () => {
 test('un chemin de validation retrouve un objet ou une zone', () => {
   assert.deepEqual(validationIssueTarget({ path: 'document.objects[0].position' }, document), { kind: 'object', id: 'object-1' });
   assert.deepEqual(validationIssueTarget({ path: 'zones[0].shape' }, document), { kind: 'zone', id: 'zone-1' });
-  assert.equal(validationIssueTarget({ path: 'objects[1].position' }, document), null);
+  assert.deepEqual(validationIssueTarget({ path: 'objects[1].position' }, document), { kind: 'door', id: 'door-1' });
 });
 
 test('un chemin de validation retrouve une case de collision ou du Blueprint', () => {

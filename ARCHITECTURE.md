@@ -93,3 +93,9 @@ Sans sauvegarde locale, l’application démarre sur une carte vide. La commande
 ## Rapport de validation
 
 Sauvegarde, import et exports présentent toutes les anomalies dans un dialogue commun, regroupées par sévérité. Chaque ligne conserve le chemin JSON et le message produits par le validateur. `validation-report.js` traduit aussi certains chemins en cibles d’éditeur : objets, zones, cellules de collision et tuiles Blueprint peuvent ainsi être affichés directement. Les problèmes globaux ou liés aux ressources restent documentés sans action lorsque aucune sélection pertinente n’existe.
+
+## Portes
+
+Une porte possède un identifiant stable, une case, un côté, un nom facultatif et des propriétés JSON libres. L’outil Porte sélectionne une porte existante et permet de la déplacer vers une autre cellule de bord ; l’inspecteur autorise aussi l’édition précise de sa position et de son orientation. Ces données sont exportées comme un objet `architecture.door`.
+
+La propriété réservée `collisionPolicy` peut valoir `unchanged`, `walkable` ou `blocked`. Elle demande à l’éditeur de préserver, libérer ou bloquer la case lors de l’application ou du déplacement de la porte. Il s’agit uniquement d’un état statique de conception : aucun mécanisme d’ouverture, de fermeture ou de verrouillage propre à un jeu n’est implémenté.
