@@ -89,3 +89,7 @@ Sans sauvegarde locale, l’application démarre sur une carte vide. La commande
 ## Modifications non sauvegardées
 
 `unsaved-changes.js` centralise l’état propre/modifié et le libellé affiché. Un remplacement par Nouveau ou Importer passe par la même confirmation. L’événement navigateur `beforeunload` est armé uniquement quand cet état est modifié, ce qui protège le rechargement, la navigation et la fermeture de l’onglet sans afficher d’avertissement après une sauvegarde réussie.
+
+## Rapport de validation
+
+Sauvegarde, import et exports présentent toutes les anomalies dans un dialogue commun, regroupées par sévérité. Chaque ligne conserve le chemin JSON et le message produits par le validateur. `validation-report.js` traduit aussi certains chemins en cibles d’éditeur : objets, zones, cellules de collision et tuiles Blueprint peuvent ainsi être affichés directement. Les problèmes globaux ou liés aux ressources restent documentés sans action lorsque aucune sélection pertinente n’existe.

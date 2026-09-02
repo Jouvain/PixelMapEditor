@@ -203,3 +203,31 @@
 #newProjectDialog select { padding: 8px; border: 1px solid #c9c5bb; background: #fff; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
 .dialog-actions button { padding: 9px 16px; border: 1px solid #aaa; background: #f4f1e9; }
+#validationDialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 32px));
+  border: 1px solid #aaa49a;
+  border-radius: 5px;
+  padding: 0;
+  background: #fbfaf6;
+  box-shadow: 0 18px 60px #252a2c55;
+}
+#validationDialog::backdrop { background: #252a2c99; }
+.validation-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 20px 22px 14px; border-bottom: 1px solid #d4d0c6; }
+.validation-header h2 { margin: 0; font: 20px Georgia, serif; }
+.validation-header p { margin: 5px 0 0; color: #777; }
+#closeValidation { border: 0; background: none; font-size: 24px; }
+.validation-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 14px 22px; }
+.validation-summary span { padding: 10px; border-radius: 3px; text-align: center; font-weight: 700; }
+.validation-summary .error { background: #f7d9d6; color: #902d26; }
+.validation-summary .warning { background: #f5e8c8; color: #765415; }
+.validation-summary .info { background: #dceaf2; color: #315f78; }
+.validation-issues { max-height: 480px; overflow: auto; padding: 0 22px 22px; }
+.validation-issue { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; padding: 12px 0; border-top: 1px solid #ddd8ce; }
+.validation-level { padding: 3px 6px; border-radius: 3px; font-size: 8px; font-weight: 800; text-transform: uppercase; }
+.validation-issue.error .validation-level { background: #c94b43; color: #fff; }
+.validation-issue.warning .validation-level { background: #d19b2f; color: #fff; }
+.validation-issue.info .validation-level { background: #4d879f; color: #fff; }
+.validation-detail code { display: block; margin-bottom: 5px; color: #6c5b4c; font-size: 10px; overflow-wrap: anywhere; }
+.validation-detail p { margin: 0; line-height: 1.4; }
+.validation-focus { padding: 6px 9px; border: 1px solid #b9a17c; background: #f5eadb; }

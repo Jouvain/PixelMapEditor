@@ -7,10 +7,12 @@ import {
 import { MapRenderer } from './src/map-renderer.js';
 import { ToolController } from './src/tools.js';
 import {
-  exportPixelMap, exportPng, exportProject, firstValidationMessage,
+  exportPixelMap, exportPng, exportProject,
   importProjectFile, loadProject, saveProject,
 } from './src/export.js';
 import { createUnsavedChangesTracker } from './src/unsaved-changes.js';
+import { stateToDocument } from './src/project-adapter.js';
+import { summarizeValidation, validationIssueTarget } from './src/validation-report.js';
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -30,6 +32,59 @@ function notify(message) {
   clearTimeout(notify.timeout);
   notify.timeout = setTimeout(() => toast.classList.remove('on'), 1500);
 }
+
+const severityLabels = { error: 'Erreur', warning: 'Avertissement', info: 'Information', information: 'Information' };
+
+function focusValidationTarget(target) {
+  if (target.kind === 'object' || target.kind === 'zone') {
+    const collection = target.kind === 'object' ? state.objects : state.zones;
+    if (!collection.some((item) => item.id === target.id)) return false;
+    state.step = 2; state.entityTool = 'select'; state.selectedEntity = { kind: target.kind, id: target.id };
+  } else if (target.kind === 'collision') {
+    state.step = 1; state.activeTool = 'collision';
+  } else if (target.kind === 'blueprint') {
+    state.step = 1; state.activeTool = 'select'; state.blueprintSelection = new Set([`${target.x},${target.y}`]);
+  } else return false;
+  $('#validationDialog').close(); refresh(); return true;
+}
+
+function showValidationReport(validation, { title = 'Validation Pixel Map v1', mapDocument = null } = {}) {
+  const counts = summarizeValidation(validation);
+  $('#validationTitle').textContent = title;
+  $('#validationSummary').replaceChildren();
+  [['error', 'erreur'], ['warning', 'avertissement'], ['info', 'information']].forEach(([severity, label]) => {
+    const item = document.createElement('span');
+    item.className = severity; item.textContent = `${counts[severity]} ${label}${counts[severity] > 1 ? 's' : ''}`;
+    $('#validationSummary').append(item);
+  });
+  $('#validationIssues').replaceChildren();
+  (validation.issues || []).forEach((issue) => {
+    const severity = issue.severity === 'information' ? 'info' : issue.severity;
+    const row = document.createElement('article'); row.className = `validation-issue ${severity}`;
+    const level = document.createElement('span'); level.className = 'validation-level'; level.textContent = severityLabels[issue.severity] || issue.severity;
+    const detail = document.createElement('div'); detail.className = 'validation-detail';
+    const path = document.createElement('code'); path.textContent = issue.path || '$';
+    const message = document.createElement('p'); message.textContent = issue.message;
+    detail.append(path, message); row.append(level, detail);
+    const target = validationIssueTarget(issue, mapDocument);
+    if (target) {
+      const focus = document.createElement('button'); focus.className = 'validation-focus'; focus.textContent = 'Afficher';
+      focus.addEventListener('click', () => focusValidationTarget(target)); row.append(focus);
+    }
+    $('#validationIssues').append(row);
+  });
+  if (!validation.issues?.length) {
+    const empty = document.createElement('p'); empty.textContent = 'Aucune anomalie détectée.'; $('#validationIssues').append(empty);
+  }
+  if (!$('#validationDialog').open) $('#validationDialog').showModal();
+  return counts;
+}
+
+function validationToast(counts) {
+  return `${counts.error} erreur(s), ${counts.warning} avertissement(s), ${counts.info} information(s)`;
+}
+
+$('#closeValidation').addEventListener('click', () => $('#validationDialog').close());
 
 function markDirty() { unsavedChanges.markModified(); }
 
@@ -260,9 +315,10 @@ $('#undo').addEventListener('click', () => { if (history.undo()) { markDirty(); 
 $('#save').addEventListener('click', () => {
   state.projectName = $('#name').value;
   const validation = saveProject(state, zoom);
-  const error = firstValidationMessage(validation);
-  if (error) notify(error);
-  else { unsavedChanges.markClean(); notify('Projet Pixel Map v1 sauvegardé'); }
+  const counts = summarizeValidation(validation);
+  if (validation.issues.length) showValidationReport(validation, { title: 'Sauvegarde du projet', mapDocument: stateToDocument(state) });
+  if (!validation.valid) notify(validationToast(counts));
+  else { unsavedChanges.markClean(); notify(validation.issues.length ? `Sauvegardé avec ${counts.warning} avertissement(s)` : 'Projet Pixel Map v1 sauvegardé'); }
 });
 $('#export').addEventListener('click', () => {
   renderer.draw({ editorOverlays: false });
@@ -272,13 +328,15 @@ $('#export').addEventListener('click', () => {
 });
 $('#exportJson').addEventListener('click', () => {
   state.projectName = $('#name').value;
-  const error = firstValidationMessage(exportPixelMap(state));
-  notify(error || 'Export Pixel Map v1 généré');
+  const validation = exportPixelMap(state); const counts = summarizeValidation(validation);
+  if (validation.issues.length) showValidationReport(validation, { title: 'Export de la carte', mapDocument: stateToDocument(state) });
+  notify(validation.valid ? (validation.issues.length ? `Exporté avec ${counts.warning} avertissement(s)` : 'Export Pixel Map v1 généré') : validationToast(counts));
 });
 $('#exportProject').addEventListener('click', () => {
   state.projectName = $('#name').value;
-  const error = firstValidationMessage(exportProject(state, zoom));
-  notify(error || 'Fichier projet généré');
+  const validation = exportProject(state, zoom); const counts = summarizeValidation(validation);
+  if (validation.issues.length) showValidationReport(validation, { title: 'Export du projet', mapDocument: stateToDocument(state) });
+  notify(validation.valid ? (validation.issues.length ? `Exporté avec ${counts.warning} avertissement(s)` : 'Fichier projet généré') : validationToast(counts));
 });
 $('#importProject').addEventListener('click', () => $('#projectFile').click());
 $('#projectFile').addEventListener('change', async (event) => {
@@ -287,11 +345,14 @@ $('#projectFile').addEventListener('change', async (event) => {
   if (!unsavedChanges.confirmDiscard((message) => window.confirm(message))) { event.target.value = ''; return; }
   try {
     const result = await importProjectFile(file, state);
-    const error = firstValidationMessage(result.validation);
-    if (error) notify(error);
-    else {
+    const counts = summarizeValidation(result.validation);
+    if (!result.validation.valid) {
+      showValidationReport(result.validation, { title: `Import de ${file.name}` });
+      notify(validationToast(counts));
+    } else {
       zoom = result.zoom; setZoom(0); $('#name').value = state.projectName;
       renderAssetLibrary(); refresh(); renderInspector(); markDirty(); notify('Projet Pixel Map v1 importé');
+      if (result.validation.issues.length) showValidationReport(result.validation, { title: `Import de ${file.name}`, mapDocument: stateToDocument(state) });
     }
   } catch (error) { notify(error.message); }
   event.target.value = '';
