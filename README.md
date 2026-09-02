@@ -112,7 +112,7 @@ Les principaux fichiers sont :
 - `src/export.js` : sauvegarde, importe et exporte les projets ;
 - `src/pixel-map-format.js` : construit et valide Pixel Map v1 ;
 - `src/project-adapter.js` : convertit l’état interne vers le format portable et inversement ;
-- `src/assets.js` et `src/portable-assets.js` : gèrent le catalogue graphique et sa portabilité.
+- `src/asset-registry.js`, `src/assets.js` et `src/portable-assets.js` : gèrent les bibliothèques graphiques, le catalogue intégré et leur portabilité.
 
 Une description plus détaillée est disponible dans [ARCHITECTURE.md](ARCHITECTURE.md).
 

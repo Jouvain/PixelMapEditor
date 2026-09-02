@@ -1,4 +1,8 @@
-export const ASSETS = [
+import { AssetRegistry } from './asset-registry.js';
+import { createPixelMapAssets } from './pixel-map-assets-format.js';
+import { portableAssetSource } from './portable-assets.js';
+
+const BUILTIN_ASSETS = [
   { id: 'desk', name: 'Bureau', category: 'work' },
   { id: 'chair', name: 'Chaise', category: 'work' },
   { id: 'computer', name: 'Ordinateur', category: 'work' },
@@ -9,7 +13,26 @@ export const ASSETS = [
   { id: 'lamp', name: 'Lampe', category: 'other' },
 ];
 
-export function drawSprite(context, type, x, y, scale = 0.6, rotation = 0) {
+export const BUILTIN_LIBRARY_ID = 'builtin';
+export const DEFAULT_ASSET_REF = `${BUILTIN_LIBRARY_ID}:desk`;
+
+export const BUILTIN_ASSET_LIBRARY = createPixelMapAssets({
+  id: BUILTIN_LIBRARY_ID,
+  name: 'Assets intégrés',
+  resources: BUILTIN_ASSETS.map((asset) => ({
+    id: asset.id,
+    name: asset.name,
+    type: 'image',
+    source: portableAssetSource('objects', asset.id),
+    size: { width: 96, height: 96 },
+    anchor: { x: 0.5, y: 0.5 },
+    category: asset.category,
+    tags: [asset.id, asset.category],
+    properties: { builtin: true },
+  })),
+});
+
+function drawBuiltinSprite(context, type, x, y, scale = 0.6, rotation = 0) {
   const rectangle = (left, top, width, height, color) => {
     context.fillStyle = color;
     context.fillRect(left, top, width, height);
@@ -41,3 +64,8 @@ export function drawSprite(context, type, x, y, scale = 0.6, rotation = 0) {
   }
   context.restore();
 }
+
+export const assetRegistry = new AssetRegistry();
+assetRegistry.addLibrary(BUILTIN_ASSET_LIBRARY, {
+  draw: (context, asset, x, y, scale, rotation) => drawBuiltinSprite(context, asset.id, x, y, scale, rotation),
+});

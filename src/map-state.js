@@ -1,4 +1,5 @@
 import { polygonSelfIntersects } from './geometry.js';
+import { DEFAULT_ASSET_REF } from './assets.js';
 export { polygonSelfIntersects } from './geometry.js';
 
 export const DEFAULT_GRID = Object.freeze({ columns: 36, rows: 24, cellWidth: 32, cellHeight: 32 });
@@ -41,7 +42,7 @@ export function createMapState(grid = DEFAULT_GRID, { template = 'demo', project
     selectedEntity: null,
     selectedDoorId: null,
     selectedZoneVertex: null,
-    selectedAsset: 'desk',
+    selectedAsset: DEFAULT_ASSET_REF,
     grid: normalizedGrid,
     cells: initialCells,
     collisionCells: new Set(initialCells),
@@ -322,17 +323,21 @@ export function deleteSelectedDoor(state) {
 
 export function placeOrRotateObject(state, position) {
   if (!hasCell(state, position.x, position.y)) return false;
+  if (!state.selectedAsset || typeof state.selectedAsset !== 'string') return false;
   const object = state.objects.find((item) =>
     Math.abs(item.x - position.x) < 2 && Math.abs(item.y - position.y) < 2);
   if (object) object.rotation = ((object.rotation || 0) + 1) % 4;
-  else state.objects.push({ id: crypto.randomUUID(), type: `furniture.${state.selectedAsset}`, assetId: state.selectedAsset, name: '', properties: {}, ...position, pixelX: (position.x + 0.5) * state.grid.cellWidth, pixelY: (position.y + 0.5) * state.grid.cellHeight, rotation: 0 });
+  else {
+    const localAssetId = state.selectedAsset.includes(':') ? state.selectedAsset.slice(state.selectedAsset.indexOf(':') + 1) : state.selectedAsset;
+    state.objects.push({ id: crypto.randomUUID(), type: `furniture.${localAssetId}`, assetRef: state.selectedAsset, name: '', properties: {}, ...position, pixelX: (position.x + 0.5) * state.grid.cellWidth, pixelY: (position.y + 0.5) * state.grid.cellHeight, rotation: 0 });
+  }
   const selected = object || state.objects.at(-1);
   state.selectedEntity = { kind: 'object', id: selected.id };
   return true;
 }
 
 export function placeGenericObject(state, position) {
-  const object = { id: crypto.randomUUID(), type: 'object.generic', assetId: null, name: 'Nouvel objet', properties: {}, ...position, pixelX: (position.x + 0.5) * state.grid.cellWidth, pixelY: (position.y + 0.5) * state.grid.cellHeight, rotation: 0 };
+  const object = { id: crypto.randomUUID(), type: 'object.generic', assetRef: null, name: 'Nouvel objet', properties: {}, ...position, pixelX: (position.x + 0.5) * state.grid.cellWidth, pixelY: (position.y + 0.5) * state.grid.cellHeight, rotation: 0 };
   state.objects.push(object);
   state.selectedEntity = { kind: 'object', id: object.id };
   return object;
@@ -527,7 +532,7 @@ export function applySerializable(state, data) {
     selectedEntity: data.selectedEntity ?? null,
     selectedDoorId: data.selectedDoorId ?? null,
     selectedZoneVertex: data.selectedZoneVertex ?? null,
-    selectedAsset: data.selectedAsset ?? state.selectedAsset,
+    selectedAsset: data.selectedAsset?.includes(':') ? data.selectedAsset : (data.selectedAsset ? `builtin:${data.selectedAsset}` : state.selectedAsset),
     wallColor: data.wallColor ?? data.wall ?? state.wallColor,
     wallWidth: data.wallWidth ?? data.width ?? state.wallWidth,
     showGrid: data.showGrid ?? (typeof data.grid === 'boolean' ? data.grid : state.showGrid),
@@ -549,7 +554,11 @@ export function applySerializable(state, data) {
   });
   state.objects.forEach((object) => {
     object.type ||= object.t;
-    if (object.assetId === undefined) object.assetId = object.type;
+    if (object.assetRef === undefined) {
+      const legacyAssetId = object.assetId ?? (object.type?.startsWith('furniture.') ? object.type.slice('furniture.'.length) : object.type);
+      object.assetRef = legacyAssetId ? (legacyAssetId.includes(':') ? legacyAssetId : `builtin:${legacyAssetId}`) : null;
+    }
+    delete object.assetId;
     object.name ??= '';
     object.properties ??= {};
     object.rotation ??= object.r || 0;

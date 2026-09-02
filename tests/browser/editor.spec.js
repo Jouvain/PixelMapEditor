@@ -63,6 +63,26 @@ test('clic-glissement, zoom et redimensionnement réel du canvas', async ({ page
     .toEqual({ width: 480, height: 240 });
 });
 
+test('la palette builtin place et exporte une référence qualifiée', async ({ page }) => {
+  await dragLogical(page, { x: 68, y: 68 }, { x: 92, y: 92 });
+  await page.locator('#next').click();
+
+  await expect(page.locator('#assets button')).toHaveCount(8);
+  const desk = page.locator('#assets button').filter({ hasText: 'Bureau' });
+  await desk.click();
+  await clickLogical(page, 80, 80);
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#exportJson').click();
+  const document = await downloadedJson(await downloadPromise);
+  expect(document.objects).toHaveLength(1);
+  expect(document.objects[0].resource).toBe('builtin:desk');
+  expect(document.resources.find((resource) => resource.id === 'builtin:desk')).toMatchObject({
+    type: 'image',
+    properties: { library: 'builtin', assetId: 'desk' },
+  });
+});
+
 test('création d’un polygone, déplacement d’un sommet et téléchargement JSON', async ({ page }) => {
   await page.locator('#next').click();
   await page.locator('[data-entity-tool="zone"]').click();

@@ -1,4 +1,4 @@
-import { ASSETS, drawSprite } from './src/assets.js';
+import { assetRegistry } from './src/assets.js';
 import {
   addPolygonVertex, analyzeCollisionConsistency, analyzeGridResize, changeObjectOrder, copyBlueprintSelection, copyCollisionFromBlueprint, createHistory, createMapState,
   deleteBlueprintSelection, deletePolygonVertex, deleteSelectedDoor, deleteSelectedEntity, duplicateBlueprintSelection,
@@ -21,7 +21,7 @@ const canvas = $('#map');
 const state = createMapState(undefined, { template: 'empty' });
 const loadedProject = loadProject(state);
 const history = createHistory(state);
-const renderer = new MapRenderer(canvas, state);
+const renderer = new MapRenderer(canvas, state, assetRegistry);
 let zoom = loadedProject.zoom || 1;
 const unsavedChanges = createUnsavedChangesTracker({ onStatus: (status) => { $('#saved').textContent = status; } });
 unsavedChanges.markClean(loadedProject.loaded ? 'Sauvegardé' : 'Nouveau');
@@ -189,16 +189,16 @@ function renderAssetLibrary() {
   const category = $('.cats .on').dataset.cat;
   const query = $('#search').value.toLowerCase();
   $('#assets').replaceChildren();
-  ASSETS.filter((item) => (category === 'all' || item.category === category) && item.name.toLowerCase().includes(query))
+  assetRegistry.search(query, category)
     .forEach((item) => {
       const button = document.createElement('button');
       const preview = document.createElement('canvas');
       preview.width = 96; preview.height = 70;
-      drawSprite(preview.getContext('2d'), item.id, 48, 35, 0.75);
-      button.classList.toggle('on', state.selectedAsset === item.id);
+      assetRegistry.draw(preview.getContext('2d'), item.ref, 48, 35, 0.75);
+      button.classList.toggle('on', state.selectedAsset === item.ref);
       button.append(preview);
-      button.insertAdjacentHTML('beforeend', `<b>${item.name}</b>`);
-      button.addEventListener('click', () => { state.selectedAsset = item.id; renderAssetLibrary(); });
+      const label = document.createElement('b'); label.textContent = item.name; button.append(label);
+      button.addEventListener('click', () => { state.selectedAsset = item.ref; renderAssetLibrary(); });
       $('#assets').append(button);
     });
 }

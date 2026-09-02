@@ -58,7 +58,7 @@ Une zone possède un `id`, un `type`, des propriétés et une forme `rectangle` 
     "activeStep": "blueprint",
     "activeTool": "room",
     "selectedLayer": "floor",
-    "selectedAsset": "desk",
+    "selectedAsset": "builtin:desk",
     "zoom": 1,
     "showGrid": true,
     "properties": {}

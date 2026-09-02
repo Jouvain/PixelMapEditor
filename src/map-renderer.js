@@ -1,11 +1,11 @@
 import { hasCell, objectPosition, polygonSelfIntersects } from './map-state.js';
-import { drawSprite } from './assets.js';
 
 export class MapRenderer {
-  constructor(canvas, state) {
+  constructor(canvas, state, assetRegistry = null) {
     this.canvas = canvas;
     this.context = canvas.getContext('2d');
     this.state = state;
+    this.assetRegistry = assetRegistry;
     this.preview = null;
   }
 
@@ -144,7 +144,9 @@ export class MapRenderer {
     const scale = 0.58 * Math.min(cellWidth, cellHeight) / 32;
     this.state.objects.forEach((object) => {
       const { x: centerX, y: centerY } = objectPosition(this.state, object);
-      if (object.assetId) drawSprite(this.context, object.assetId, centerX, centerY, scale, object.rotation);
+      if (object.assetRef && this.assetRegistry?.draw(this.context, object.assetRef, centerX, centerY, scale, object.rotation)) {
+        // Le registre choisit le renderer correspondant à la bibliothèque.
+      }
       else if (editorOverlays) {
         this.context.fillStyle = '#7248a8'; this.context.strokeStyle = '#fff'; this.context.lineWidth = 2;
         this.context.beginPath(); this.context.arc(centerX, centerY, Math.max(5, Math.min(cellWidth, cellHeight) * 0.24), 0, Math.PI * 2); this.context.fill(); this.context.stroke();

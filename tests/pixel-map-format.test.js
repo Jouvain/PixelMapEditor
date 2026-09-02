@@ -4,7 +4,7 @@ import {
   addPolygonVertex, analyzeCollisionConsistency, analyzeGridResize, applySerializable, changeObjectOrder, copyBlueprintSelection, copyCollisionFromBlueprint, createHistory, createMapState, createPolygonZone,
   applyDoorCollision, createRectangleZone, deleteBlueprintSelection, deletePolygonVertex, deleteSelectedDoor, deleteSelectedEntity, duplicateBlueprintSelection,
   fillCollisionRegion, getSelectedDoor, invertCollision, moveBlueprintSelection, moveDoor, moveObject, normalizeGrid, objectPosition, paintCollisionRectangle, paintRectangle,
-  pasteBlueprintSelection, placeGenericObject, polygonSelfIntersects, resizeGrid, resizeRectangleZone,
+  pasteBlueprintSelection, placeGenericObject, placeOrRotateObject, polygonSelfIntersects, resizeGrid, resizeRectangleZone,
   selectBlueprintRectangle, selectEntityAt, setAllCollision, toggleDoor, translateZone, updateDoor, validDoorSides,
 } from '../src/map-state.js';
 import { projectToState, stateToDocument, stateToProject } from '../src/project-adapter.js';
@@ -152,6 +152,35 @@ test('un objet générique conserve son type, son nom et ses propriétés', () =
   const destination = createMapState();
   projectToState(stateToProject(source), destination);
   assert.equal(destination.objects.find((item) => item.id === object.id).name, 'Départ principal');
+});
+
+test('un asset intégré utilise une référence qualifiée dans l’état et le document', () => {
+  const state = createMapState();
+  assert.equal(state.selectedAsset, 'builtin:desk');
+  assert.equal(placeOrRotateObject(state, { x: 4, y: 4 }), true);
+  assert.equal(state.objects[0].assetRef, 'builtin:desk');
+  assert.equal(state.objects[0].assetId, undefined);
+
+  const document = stateToDocument(state);
+  const object = document.objects.find((item) => item.id === state.objects[0].id);
+  const resource = document.resources.find((item) => item.id === 'builtin:desk');
+  assert.equal(object.resource, 'builtin:desk');
+  assert.equal(resource.properties.library, 'builtin');
+  assert.equal(resource.properties.assetId, 'desk');
+  assert.equal(validatePixelMap(document).valid, true);
+});
+
+test('les anciens assetId et selectedAsset sont migrés vers builtin', () => {
+  const state = createMapState();
+  applySerializable(state, {
+    ...state,
+    selectedAsset: 'chair',
+    cells: [...state.cells], collisionCells: [...state.collisionCells],
+    objects: [{ id: 'legacy-chair', type: 'chair', assetId: 'chair', x: 4, y: 4, rotation: 0 }],
+  });
+  assert.equal(state.selectedAsset, 'builtin:chair');
+  assert.equal(state.objects[0].assetRef, 'builtin:chair');
+  assert.equal(state.objects[0].assetId, undefined);
 });
 
 test('une zone générique fait un aller-retour et peut être supprimée', () => {

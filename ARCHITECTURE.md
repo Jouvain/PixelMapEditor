@@ -15,7 +15,8 @@ Entrées utilisateur → tools.js → map-state.js → map-renderer.js
 - `src/map-renderer.js` : dessine l’état courant dans le canvas. Il ne gère aucun clic.
 - `src/tools.js` : transforme les clics et glissements en actions métier.
 - `src/export.js` : sauvegarde, recharge et exporte le projet.
-- `src/assets.js` : catalogue et dessin des meubles pixel art.
+- `src/asset-registry.js` : registre les bibliothèques et expose leurs ressources par référence qualifiée.
+- `src/assets.js` : déclare la bibliothèque `builtin` et son renderer pixel art.
 - `src/pixel-map-format.js` : construit et valide les documents Pixel Map v1.
 - `src/project-adapter.js` : convertit l’état interne vers le format portable et inversement.
 - `docs/PIXEL_MAP_V1.md` : spécification lisible du format.
@@ -59,6 +60,8 @@ En Habillage, `state.entityTool` choisit entre placement d’asset, création d�
 Les zones peuvent être rectangulaires ou polygonales. Un polygone est construit par sommets, sélectionné par un test point-dans-polygone et ses sommets sont éditables dans le canvas. Les coordonnées exportées restent des coordonnées logiques Pixel Map v1.
 
 ## Ressources graphiques portables
+
+L’interface, le renderer et l’adaptateur partagent une instance unique d’`AssetRegistry`. L’état stocke `assetRef` sous forme qualifiée, par exemple `builtin:desk`, et non un identifiant dépendant du catalogue interne. Le registre normalise les catalogues Pixel Map Assets, recherche les ressources et résout leurs sources. Le renderer propre à chaque bibliothèque reste une dépendance d’exécution et ne fait pas partie du catalogue portable.
 
 Les ressources produites par l’éditeur sont embarquées directement dans le JSON sous forme d’URI `data:image/svg+xml`. Un consommateur Pixel Map n’a donc besoin ni du catalogue de PixelMapEditor, ni d’un résolveur propriétaire. Le format accepte aussi une URL HTTPS ou un chemin relatif vers un fichier image, afin de permettre à un autre producteur de distribuer un JSON accompagné de ses images.
 

@@ -1,5 +1,5 @@
 import { applySerializable, normalizeGrid } from './map-state.js';
-import { ASSETS } from './assets.js';
+import { assetRegistry } from './assets.js';
 import { createPixelMapDocument, createPixelMapProject } from './pixel-map-format.js';
 import { migrateLegacyAssetSource, portableAssetSource } from './portable-assets.js';
 
@@ -17,6 +17,12 @@ function mergeResource(existing, generated) {
   if (!existing) return generated;
   const source = migrateLegacyAssetSource(existing.source) || existing.source || generated.source;
   return { ...existing, ...generated, source, properties: clone(existing.properties ?? generated.properties) };
+}
+
+function normalizeLegacyAssetRef(resource) {
+  if (!resource) return null;
+  if (resource.startsWith('asset.')) return `builtin:${resource.slice('asset.'.length)}`;
+  return resource;
 }
 
 export function stateToDocument(state) {
@@ -37,13 +43,20 @@ export function stateToDocument(state) {
   document.resources = clone(document.resources || []);
   document.layers = clone(document.layers || []);
 
-  const knownAssetIds = new Set(ASSETS.map((item) => item.id));
-  const assetFor = (object) => object.assetId || (knownAssetIds.has(object.type) ? object.type : null);
+  const assetFor = (object) => {
+    if (object.assetRef) return object.assetRef;
+    if (object.assetId) return `builtin:${object.assetId}`;
+    const legacyBuiltinRef = `builtin:${object.type}`;
+    return assetRegistry.get(legacyBuiltinRef) ? legacyBuiltinRef : null;
+  };
   const usedAssets = new Set(state.objects.map(assetFor).filter(Boolean));
   const floorResource = { id: `floor.${state.floor}`, type: 'image', source: portableAssetSource('floors', state.floor), width: cellWidth, height: cellHeight, properties: { embedded: true, mediaType: 'image/svg+xml' } };
   replaceById(document.resources, floorResource.id, mergeResource(document.resources.find((item) => item.id === floorResource.id), floorResource));
-  ASSETS.filter((item) => usedAssets.has(item.id)).forEach((item) => {
-    const generated = { id: `asset.${item.id}`, type: 'image', source: portableAssetSource('objects', item.id), width: 96, height: 96, properties: { embedded: true, mediaType: 'image/svg+xml' } };
+  [...usedAssets].map((ref) => assetRegistry.get(ref)).filter(Boolean).forEach((item) => {
+    const generated = {
+      id: item.ref, type: 'image', source: item.resolvedSource, width: item.width, height: item.height,
+      properties: { library: item.libraryId, assetId: item.id, anchor: clone(item.anchor), ...clone(item.properties) },
+    };
     replaceById(document.resources, generated.id, mergeResource(document.resources.find((resource) => resource.id === generated.id), generated));
   });
 
@@ -83,17 +96,17 @@ export function stateToDocument(state) {
   const exportedObjects = state.objects.map((object, index) => {
     const id = object.id || `object-${String(index + 1).padStart(4, '0')}`;
     const existing = clone(sourceObjects.get(id) || {});
-    const assetId = assetFor(object);
+    const assetRef = assetFor(object);
     const exported = {
       ...existing, id,
-      type: object.type.startsWith('furniture.') || !assetId ? object.type : `furniture.${object.type}`,
+      type: object.type,
       position: { x: object.pixelX ?? (object.x + 0.5) * cellWidth, y: object.pixelY ?? (object.y + 0.5) * cellHeight },
       size: existing.size || { width: cellWidth, height: cellHeight }, rotation: (object.rotation || 0) * 90,
       layer: existing.layer || 'decoration', properties: clone(object.properties || {}),
     };
     if (object.name) exported.name = object.name;
     else delete exported.name;
-    if (assetId) exported.resource = `asset.${assetId}`;
+    if (assetRef) exported.resource = assetRef;
     return exported;
   });
   const exportedDoors = state.doors.map((door, index) => {
@@ -150,7 +163,7 @@ export function projectToState(project, state) {
   }));
   const objects = document.objects.filter((object) => object.type !== 'architecture.door').map((object) => ({
     id: object.id, type: object.type, name: object.name || '',
-    assetId: object.resource?.startsWith('asset.') ? object.resource.slice('asset.'.length) : null,
+    assetRef: normalizeLegacyAssetRef(object.resource),
     properties: clone(object.properties || {}),
     x: Math.floor(object.position.x / grid.cellWidth), y: Math.floor(object.position.y / grid.cellHeight),
     pixelX: object.position.x, pixelY: object.position.y,
