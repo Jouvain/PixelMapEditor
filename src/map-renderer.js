@@ -22,7 +22,7 @@ export class MapRenderer {
       const [x, y] = key.split(',').map(Number);
       this.drawFloorTile(x, y);
     });
-    if (editorOverlays && state.step === 1 && state.activeTool === 'collision') this.drawCollisionOverlay();
+    if (editorOverlays && state.step === 1 && (state.activeTool === 'collision' || state.showCollisionOverlay)) this.drawCollisionOverlay();
     if (state.showGrid) this.drawGrid();
     this.drawWalls();
     this.drawDoors();

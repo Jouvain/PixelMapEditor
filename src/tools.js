@@ -1,5 +1,5 @@
 import {
-  createPolygonZone, createRectangleZone, getSelectedEntity, moveBlueprintSelection, moveDoor, moveObject, objectPosition, paintCollisionRectangle, paintRectangle,
+  createPolygonZone, createRectangleZone, fillCollisionRegion, getSelectedEntity, moveBlueprintSelection, moveDoor, moveObject, objectPosition, paintCollisionRectangle, paintRectangle,
   placeGenericObject, placeOrRotateObject, polygonSelfIntersects, resizeRectangleZone, selectEntityAt, toggleDoor, translateZone,
   selectBlueprintRectangle,
 } from './map-state.js';
@@ -133,6 +133,10 @@ export class ToolController {
       this.blueprintDrag = { mode: this.state.blueprintSelection.has(`${position.x},${position.y}`) ? 'move' : 'select' };
       this.canvas.setPointerCapture(event.pointerId);
       this.renderer.setPreview({ start: position, end: position, blueprintSelection: this.blueprintDrag.mode === 'select', blueprintMove: this.blueprintDrag.mode === 'move' });
+      return;
+    }
+    if (this.state.activeTool === 'collision' && this.state.collisionMode === 'fill') {
+      if (fillCollisionRegion(this.state, position, this.state.collisionBrush === 'blocked')) this.changed();
       return;
     }
     this.dragging = true; this.start = position;

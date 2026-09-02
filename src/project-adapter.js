@@ -120,7 +120,7 @@ export function stateToProject(state, zoom = 1) {
     activeStep: state.step === 1 ? 'blueprint' : 'decoration', activeTool: state.activeTool,
     selectedLayer: state.step === 1 ? 'floor' : 'decoration', selectedAsset: state.selectedAsset,
     zoom, showGrid: state.showGrid,
-    properties: { collisionBrush: state.collisionBrush, entityTool: state.entityTool, zoneShape: state.zoneShape, objectSnapToGrid: state.objectSnapToGrid },
+    properties: { collisionBrush: state.collisionBrush, collisionMode: state.collisionMode, showCollisionOverlay: state.showCollisionOverlay, entityTool: state.entityTool, zoneShape: state.zoneShape, objectSnapToGrid: state.objectSnapToGrid },
   });
   if (!state.sourceProject) return generated;
   const source = clone(state.sourceProject);
@@ -160,6 +160,7 @@ export function projectToState(project, state) {
   applySerializable(state, {
     projectName: document.name, grid, step: editor.activeStep === 'blueprint' ? 1 : 2,
     activeTool: editor.activeTool, collisionBrush: editor.properties?.collisionBrush,
+    collisionMode: editor.properties?.collisionMode, showCollisionOverlay: editor.properties?.showCollisionOverlay,
     entityTool: editor.properties?.entityTool, zoneShape: editor.properties?.zoneShape,
     objectSnapToGrid: editor.properties?.objectSnapToGrid,
     selectedAsset: editor.selectedAsset, cells, collisionCells: [...collisionCells], doors, objects,

@@ -1,9 +1,9 @@
 import { ASSETS, drawSprite } from './src/assets.js';
 import {
-  addPolygonVertex, analyzeGridResize, changeObjectOrder, copyBlueprintSelection, createHistory, createMapState,
+  addPolygonVertex, analyzeCollisionConsistency, analyzeGridResize, changeObjectOrder, copyBlueprintSelection, copyCollisionFromBlueprint, createHistory, createMapState,
   deleteBlueprintSelection, deletePolygonVertex, deleteSelectedDoor, deleteSelectedEntity, duplicateBlueprintSelection,
-  getSelectedDoor, getSelectedEntity, moveObject, objectPosition, pasteBlueprintSelection, polygonSelfIntersects,
-  resizeGrid, applySerializable, toSerializable, updateDoor,
+  getSelectedDoor, getSelectedEntity, invertCollision, moveObject, objectPosition, pasteBlueprintSelection, polygonSelfIntersects,
+  resizeGrid, applySerializable, setAllCollision, toSerializable, updateDoor,
 } from './src/map-state.js';
 import { MapRenderer } from './src/map-renderer.js';
 import { ToolController } from './src/tools.js';
@@ -25,6 +25,8 @@ const renderer = new MapRenderer(canvas, state);
 let zoom = loadedProject.zoom || 1;
 const unsavedChanges = createUnsavedChangesTracker({ onStatus: (status) => { $('#saved').textContent = status; } });
 unsavedChanges.markClean(loadedProject.loaded ? 'Sauvegardé' : 'Nouveau');
+$('#collisionSettings').insertAdjacentHTML('beforeend', '<b>MODE</b><div><button class="on" data-collision-mode="paint">Pinceau</button><button data-collision-mode="fill">Remplissage</button></div><b>OPÉRATIONS</b><div><button id="invertCollision">Inverser</button><button id="blockAllCollision">Tout bloquer</button><button id="walkAllCollision">Tout praticable</button><button id="copyBlueprintCollision">Copier le Blueprint</button></div><label class="collision-overlay-toggle"><input id="showCollisionOverlay" type="checkbox"> Afficher avec les autres outils</label><small id="collisionConsistencyDetail"></small>');
+$('#doors').closest('p').insertAdjacentHTML('afterend', '<p>Incohérences collision <b id="collisionIssues">0</b></p>');
 
 function notify(message) {
   const toast = $('#toast');
@@ -98,6 +100,9 @@ function updateStats() {
   $('#collisionCells').textContent = state.collisionCells.size;
   $('#area').textContent = `${Math.round(count * 1.2)} m²`;
   $('#doors').textContent = state.doors.length;
+  const consistency = analyzeCollisionConsistency(state);
+  $('#collisionIssues').textContent = consistency.total;
+  $('#collisionConsistencyDetail').textContent = `${consistency.blockedInside} surface(s) bloquée(s), ${consistency.walkableOutside} case(s) praticable(s) hors Blueprint.`;
   $('#empty').hidden = count > 0;
   $('#rooms').textContent = count ? '1 pièce' : '0 pièce';
 }
@@ -121,6 +126,8 @@ function syncControls() {
   $('#collisionSettings').hidden = state.activeTool !== 'collision';
   $('#blueprintSelectionSettings').hidden = state.activeTool !== 'select';
   $$('[data-collision]').forEach((button) => button.classList.toggle('on', button.dataset.collision === state.collisionBrush));
+  $$('[data-collision-mode]').forEach((button) => button.classList.toggle('on', button.dataset.collisionMode === state.collisionMode));
+  $('#showCollisionOverlay').checked = state.showCollisionOverlay;
   $$('[data-entity-tool]').forEach((button) => button.classList.toggle('on', button.dataset.entityTool === state.entityTool));
   const help = {
     asset: 'Choisissez un asset puis cliquez sur la carte.',
@@ -214,6 +221,17 @@ $$('[data-collision]').forEach((button) => button.addEventListener('click', () =
   state.collisionBrush = button.dataset.collision;
   syncControls(); renderer.draw();
 }));
+$$('[data-collision-mode]').forEach((button) => button.addEventListener('click', () => {
+  state.collisionMode = button.dataset.collisionMode; syncControls(); renderer.draw();
+}));
+function changeCollision(operation, message) {
+  history.checkpoint(); operation(); markDirty(); updateStats(); renderer.draw(); notify(message);
+}
+$('#invertCollision').addEventListener('click', () => changeCollision(() => invertCollision(state), 'Collision inversée'));
+$('#blockAllCollision').addEventListener('click', () => changeCollision(() => setAllCollision(state, false), 'Toutes les cases sont bloquées'));
+$('#walkAllCollision').addEventListener('click', () => changeCollision(() => setAllCollision(state, true), 'Toutes les cases sont praticables'));
+$('#copyBlueprintCollision').addEventListener('click', () => changeCollision(() => copyCollisionFromBlueprint(state), 'Collision copiée depuis le Blueprint'));
+$('#showCollisionOverlay').addEventListener('change', (event) => { state.showCollisionOverlay = event.target.checked; markDirty(); renderer.draw(); });
 function changeBlueprintSelection(action, message) {
   history.checkpoint();
   if (!action()) { notify('Aucune surface sélectionnée.'); return false; }

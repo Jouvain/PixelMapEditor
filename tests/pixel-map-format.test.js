@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  addPolygonVertex, analyzeGridResize, applySerializable, changeObjectOrder, copyBlueprintSelection, createHistory, createMapState, createPolygonZone,
+  addPolygonVertex, analyzeCollisionConsistency, analyzeGridResize, applySerializable, changeObjectOrder, copyBlueprintSelection, copyCollisionFromBlueprint, createHistory, createMapState, createPolygonZone,
   applyDoorCollision, createRectangleZone, deleteBlueprintSelection, deletePolygonVertex, deleteSelectedDoor, deleteSelectedEntity, duplicateBlueprintSelection,
-  getSelectedDoor, moveBlueprintSelection, moveDoor, moveObject, normalizeGrid, objectPosition, paintCollisionRectangle, paintRectangle,
+  fillCollisionRegion, getSelectedDoor, invertCollision, moveBlueprintSelection, moveDoor, moveObject, normalizeGrid, objectPosition, paintCollisionRectangle, paintRectangle,
   pasteBlueprintSelection, placeGenericObject, polygonSelfIntersects, resizeGrid, resizeRectangleZone,
-  selectBlueprintRectangle, selectEntityAt, toggleDoor, translateZone, updateDoor, validDoorSides,
+  selectBlueprintRectangle, selectEntityAt, setAllCollision, toggleDoor, translateZone, updateDoor, validDoorSides,
 } from '../src/map-state.js';
 import { projectToState, stateToDocument, stateToProject } from '../src/project-adapter.js';
 import { validatePixelMap, validatePixelMapProject } from '../src/pixel-map-format.js';
@@ -458,4 +458,40 @@ test('le nom et les métadonnées d’une porte font un aller-retour Pixel Map',
   const destination = createMapState(); projectToState(project, destination);
   assert.equal(destination.doors[0].name, 'Entrée principale');
   assert.deepEqual(destination.doors[0].properties, exported.properties);
+});
+
+test('le remplissage de collision modifie uniquement la région contiguë', () => {
+  const state = createMapState({ columns: 5, rows: 4, cellWidth: 16, cellHeight: 16 }, { template: 'empty' });
+  state.collisionCells = new Set(['0,0', '1,0', '1,1', '4,3']);
+  assert.equal(fillCollisionRegion(state, { x: 0, y: 0 }, true), 3);
+  assert.deepEqual([...state.collisionCells], ['4,3']);
+  assert.equal(fillCollisionRegion(state, { x: 2, y: 2 }, false), 19);
+  assert.equal(state.collisionCells.size, 20);
+});
+
+test('la collision peut être inversée, entièrement bloquée ou praticable', () => {
+  const state = createMapState({ columns: 3, rows: 2, cellWidth: 16, cellHeight: 16 }, { template: 'empty' });
+  state.collisionCells.add('0,0');
+  invertCollision(state);
+  assert.equal(state.collisionCells.size, 5);
+  assert.equal(state.collisionCells.has('0,0'), false);
+  setAllCollision(state, false); assert.equal(state.collisionCells.size, 0);
+  setAllCollision(state, true); assert.equal(state.collisionCells.size, 6);
+});
+
+test('la copie depuis le Blueprint reste explicite et les incohérences sont comptées', () => {
+  const state = createMapState({ columns: 5, rows: 5, cellWidth: 16, cellHeight: 16 }, { template: 'empty' });
+  state.cells = new Set(['1,1', '2,1']);
+  state.collisionCells = new Set(['1,1', '4,4']);
+  assert.deepEqual(analyzeCollisionConsistency(state), { blockedInside: 1, walkableOutside: 1, total: 2 });
+  copyCollisionFromBlueprint(state);
+  assert.deepEqual([...state.collisionCells].sort(), ['1,1', '2,1']);
+  assert.deepEqual(analyzeCollisionConsistency(state), { blockedInside: 0, walkableOutside: 0, total: 0 });
+});
+
+test('les préférences d’outil et d’affichage de collision font un aller-retour projet', () => {
+  const source = createMapState(); source.collisionMode = 'fill'; source.showCollisionOverlay = true;
+  const destination = createMapState(); projectToState(stateToProject(source), destination);
+  assert.equal(destination.collisionMode, 'fill');
+  assert.equal(destination.showCollisionOverlay, true);
 });

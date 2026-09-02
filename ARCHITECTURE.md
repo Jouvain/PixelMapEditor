@@ -99,3 +99,9 @@ Sauvegarde, import et exports présentent toutes les anomalies dans un dialogue 
 Une porte possède un identifiant stable, une case, un côté, un nom facultatif et des propriétés JSON libres. L’outil Porte sélectionne une porte existante et permet de la déplacer vers une autre cellule de bord ; l’inspecteur autorise aussi l’édition précise de sa position et de son orientation. Ces données sont exportées comme un objet `architecture.door`.
 
 La propriété réservée `collisionPolicy` peut valoir `unchanged`, `walkable` ou `blocked`. Elle demande à l’éditeur de préserver, libérer ou bloquer la case lors de l’application ou du déplacement de la porte. Il s’agit uniquement d’un état statique de conception : aucun mécanisme d’ouverture, de fermeture ou de verrouillage propre à un jeu n’est implémenté.
+
+## Outils de collision
+
+La couche de collision propose un pinceau rectangulaire et un remplissage contigu, ainsi que les opérations globales inverser, tout bloquer et tout rendre praticable. `showCollisionOverlay` permet de conserver sa visualisation lorsqu’un autre outil Blueprint est actif. Ces préférences appartiennent au projet de l’éditeur, pas au document portable.
+
+`analyzeCollisionConsistency` compare la surface graphique et les cases praticables en distinguant les surfaces bloquées des cases praticables hors Blueprint. Ce compteur est seulement diagnostique : aucune correction automatique n’est effectuée. `copyCollisionFromBlueprint` constitue l’unique synchronisation globale et ne s’exécute qu’à la demande explicite de l’utilisateur.

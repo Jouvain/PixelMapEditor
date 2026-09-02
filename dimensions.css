@@ -73,6 +73,15 @@
 .collision-settings [data-collision="blocked"] i {
   background: #b8362d;
 }
+.collision-overlay-toggle {
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 !important;
+}
+.collision-overlay-toggle input { width: auto; }
+#collisionConsistencyDetail { line-height: 1.4; }
 .entity-tools {
   display: grid;
   grid-template-columns: 1fr 1fr;

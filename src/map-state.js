@@ -33,6 +33,8 @@ export function createMapState(grid = DEFAULT_GRID, { template = 'demo', project
     blueprintSelection: new Set(),
     blueprintClipboard: null,
     collisionBrush: 'walkable',
+    collisionMode: 'paint',
+    showCollisionOverlay: false,
     entityTool: 'asset',
     objectSnapToGrid: true,
     zoneShape: 'rectangle',
@@ -136,6 +138,50 @@ export function paintCollisionRectangle(state, start, end, blocked = false) {
       blocked ? state.collisionCells.delete(cellKey(x, y)) : state.collisionCells.add(cellKey(x, y));
     }
   }
+}
+
+export function fillCollisionRegion(state, start, blocked = false) {
+  const desiredWalkable = !blocked;
+  const startsWalkable = state.collisionCells.has(cellKey(start.x, start.y));
+  if (startsWalkable === desiredWalkable) return 0;
+  const queue = [start], visited = new Set(), { columns, rows } = state.grid;
+  let changed = 0;
+  while (queue.length) {
+    const point = queue.pop(), key = cellKey(point.x, point.y);
+    if (visited.has(key) || state.collisionCells.has(key) !== startsWalkable) continue;
+    visited.add(key);
+    desiredWalkable ? state.collisionCells.add(key) : state.collisionCells.delete(key);
+    changed += 1;
+    [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dx, dy]) => {
+      const x = point.x + dx, y = point.y + dy;
+      if (x >= 0 && y >= 0 && x < columns && y < rows) queue.push({ x, y });
+    });
+  }
+  return changed;
+}
+
+export function setAllCollision(state, walkable) {
+  state.collisionCells.clear();
+  if (walkable) for (let y = 0; y < state.grid.rows; y += 1) for (let x = 0; x < state.grid.columns; x += 1) state.collisionCells.add(cellKey(x, y));
+}
+
+export function invertCollision(state) {
+  const inverted = new Set();
+  for (let y = 0; y < state.grid.rows; y += 1) for (let x = 0; x < state.grid.columns; x += 1) {
+    const key = cellKey(x, y); if (!state.collisionCells.has(key)) inverted.add(key);
+  }
+  state.collisionCells = inverted;
+}
+
+export function copyCollisionFromBlueprint(state) {
+  state.collisionCells = new Set(state.cells);
+}
+
+export function analyzeCollisionConsistency(state) {
+  let blockedInside = 0, walkableOutside = 0;
+  state.cells.forEach((key) => { if (!state.collisionCells.has(key)) blockedInside += 1; });
+  state.collisionCells.forEach((key) => { if (!state.cells.has(key)) walkableOutside += 1; });
+  return { blockedInside, walkableOutside, total: blockedInside + walkableOutside };
 }
 
 export function selectBlueprintRectangle(state, start, end) {
@@ -473,6 +519,8 @@ export function applySerializable(state, data) {
     projectName: data.projectName ?? data.name ?? state.projectName,
     activeTool: data.activeTool ?? state.activeTool,
     collisionBrush: data.collisionBrush ?? state.collisionBrush,
+    collisionMode: data.collisionMode ?? state.collisionMode,
+    showCollisionOverlay: data.showCollisionOverlay ?? state.showCollisionOverlay,
     entityTool: data.entityTool ?? state.entityTool,
     objectSnapToGrid: data.objectSnapToGrid ?? state.objectSnapToGrid,
     zoneShape: data.zoneShape ?? state.zoneShape,
