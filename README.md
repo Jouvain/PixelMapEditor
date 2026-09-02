@@ -48,6 +48,10 @@ Les imports et exports sont validés selon Pixel Map v1. Le rapport de validatio
 
 La spécification détaillée se trouve dans [docs/PIXEL_MAP_V1.md](docs/PIXEL_MAP_V1.md), avec son schéma dans [docs/pixel-map-v1.schema.json](docs/pixel-map-v1.schema.json).
 
+Le contrat des identifiants publics destinés aux futurs catalogues d’assets et aux adaptateurs de jeux est défini dans [docs/PIXEL_MAP_ASSET_IDENTIFIERS.md](docs/PIXEL_MAP_ASSET_IDENTIFIERS.md).
+
+Le format des catalogues d’images réutilisables est spécifié dans [docs/PIXEL_MAP_ASSETS_V1.md](docs/PIXEL_MAP_ASSETS_V1.md), avec son schéma dans [docs/pixel-map-assets-v1.schema.json](docs/pixel-map-assets-v1.schema.json).
+
 ## Démarrage
 
 Prérequis :

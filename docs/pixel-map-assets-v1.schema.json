@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixel-map.local/schema/pixel-map-assets-v1.schema.json",
+  "title": "Pixel Map Assets v1",
+  "type": "object",
+  "required": ["format", "version", "id", "name", "resources", "properties"],
+  "properties": {
+    "format": { "const": "pixel-map-assets" },
+    "version": { "const": "1.0" },
+    "id": { "$ref": "#/$defs/libraryId" },
+    "name": { "type": "string", "minLength": 1 },
+    "resources": { "type": "array", "items": { "$ref": "#/$defs/resource" } },
+    "properties": { "$ref": "#/$defs/properties" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "libraryId": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"
+    },
+    "resourceId": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$"
+    },
+    "properties": { "type": "object" },
+    "size": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "anchor": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "anyOf": [
+        { "pattern": "^data:image/" },
+        { "pattern": "^[hH][tT][tT][pP][sS]://" },
+        { "pattern": "^(?![/\\\\])(?!.+:)[^\\\\?#]+\\.(?:[pP][nN][gG]|[jJ][pP][eE]?[gG]|[gG][iI][fF]|[wW][eE][bB][pP]|[sS][vV][gG])(?:[?#].*)?$" }
+      ]
+    },
+    "resource": {
+      "type": "object",
+      "required": ["id", "name", "type", "source", "size", "anchor", "category", "tags", "properties"],
+      "properties": {
+        "id": { "$ref": "#/$defs/resourceId" },
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "const": "image" },
+        "source": { "$ref": "#/$defs/source" },
+        "size": { "$ref": "#/$defs/size" },
+        "anchor": { "$ref": "#/$defs/anchor" },
+        "category": { "type": "string", "minLength": 1 },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "properties": { "$ref": "#/$defs/properties" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

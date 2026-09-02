@@ -1,0 +1,45 @@
+{
+  "format": "pixel-map-assets",
+  "version": "1.0",
+  "id": "office",
+  "name": "Mobilier de bureau — Fixture",
+  "resources": [
+    {
+      "id": "desk.standard",
+      "name": "Bureau standard",
+      "type": "image",
+      "source": "./previews/desk.svg",
+      "size": { "width": 64, "height": 48 },
+      "anchor": { "x": 0.5, "y": 1 },
+      "category": "furniture",
+      "tags": ["desk", "office", "work"],
+      "properties": { "fixture": true }
+    },
+    {
+      "id": "chair.task",
+      "name": "Chaise de bureau",
+      "type": "image",
+      "source": "./previews/chair.svg",
+      "size": { "width": 32, "height": 40 },
+      "anchor": { "x": 0.5, "y": 1 },
+      "category": "furniture",
+      "tags": ["chair", "office", "work"],
+      "properties": { "fixture": true }
+    },
+    {
+      "id": "plant.potted",
+      "name": "Plante en pot",
+      "type": "image",
+      "source": "./previews/plant.svg",
+      "size": { "width": 32, "height": 48 },
+      "anchor": { "x": 0.5, "y": 1 },
+      "category": "decoration",
+      "tags": ["plant", "office", "nature"],
+      "properties": { "fixture": true }
+    }
+  ],
+  "properties": {
+    "fixture": true,
+    "description": "Catalogue d’intégration pour PixelMapEditor"
+  }
+}
