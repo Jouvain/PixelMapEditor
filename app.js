@@ -22,6 +22,7 @@ const state = createMapState(undefined, { template: 'empty' });
 const loadedProject = loadProject(state);
 const history = createHistory(state);
 const renderer = new MapRenderer(canvas, state, assetRegistry);
+renderer.assetImageLoader.subscribe(() => renderAssetLibrary());
 let zoom = loadedProject.zoom || 1;
 const unsavedChanges = createUnsavedChangesTracker({ onStatus: (status) => { $('#saved').textContent = status; } });
 unsavedChanges.markClean(loadedProject.loaded ? 'Sauvegardé' : 'Nouveau');
@@ -194,7 +195,8 @@ function renderAssetLibrary() {
       const button = document.createElement('button');
       const preview = document.createElement('canvas');
       preview.width = 96; preview.height = 70;
-      assetRegistry.draw(preview.getContext('2d'), item.ref, 48, 35, 0.75);
+      const previewScale = Math.min(0.75, 80 / item.width, 60 / item.height);
+      renderer.drawAsset(preview.getContext('2d'), item.ref, 48, 35, { scale: previewScale, placeholderSize: 40 });
       button.classList.toggle('on', state.selectedAsset === item.ref);
       button.append(preview);
       const label = document.createElement('b'); label.textContent = item.name; button.append(label);

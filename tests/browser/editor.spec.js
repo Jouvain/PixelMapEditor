@@ -83,6 +83,39 @@ test('la palette builtin place et exporte une référence qualifiée', async ({ 
   });
 });
 
+test('charge, affiche, place et exporte une image de catalogue externe', async ({ page }) => {
+  await dragLogical(page, { x: 68, y: 68 }, { x: 92, y: 92 });
+  await page.locator('#next').click();
+  await page.evaluate(async () => {
+    const { assetRegistry } = await import('/src/assets.js');
+    assetRegistry.addLibrary({
+      format: 'pixel-map-assets', version: '1.0', id: 'external', name: 'Catalogue externe',
+      resources: [{
+        id: 'marker.green', name: 'Marqueur externe', type: 'image',
+        source: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="32" height="32"%3E%3Crect width="32" height="32" fill="%2300ff00"/%3E%3C/svg%3E',
+        size: { width: 32, height: 32 }, anchor: { x: 0.5, y: 1 },
+        category: 'other', tags: ['external', 'marker'], properties: {},
+      }], properties: {},
+    });
+  });
+  await page.locator('#search').fill('external');
+  const externalAsset = page.locator('#assets button').filter({ hasText: 'Marqueur externe' });
+  await expect(externalAsset).toBeVisible();
+  await expect.poll(() => externalAsset.locator('canvas').evaluate((canvas) => {
+    const pixel = canvas.getContext('2d').getImageData(48, 30, 1, 1).data;
+    return pixel[1];
+  })).toBeGreaterThan(200);
+
+  await externalAsset.click();
+  await clickLogical(page, 80, 80);
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#exportJson').click();
+  const document = await downloadedJson(await downloadPromise);
+  expect(document.objects[0].resource).toBe('external:marker.green');
+  expect(document.resources.find((resource) => resource.id === 'external:marker.green').source)
+    .toMatch(/^data:image\/svg\+xml/);
+});
+
 test('création d’un polygone, déplacement d’un sommet et téléchargement JSON', async ({ page }) => {
   await page.locator('#next').click();
   await page.locator('[data-entity-tool="zone"]').click();

@@ -41,6 +41,7 @@ La carte ne contient que la référence publique :
   "position": { "x": 128, "y": 96 },
   "properties": {}
 }
+
 Étape 1 — Fixer le contrat d’identification OK
 C’est la décision à prendre avant d’écrire du code.
 Je recommande :
@@ -58,7 +59,8 @@ office:desk.standard → Unity GUID
 office:desk.standard → Godot UID
 office:desk.standard → clé JavaScript
 Ne mets pas ces GUID ou chemins natifs dans Pixel Map Assets. Ils appartiennent à l’adaptateur du jeu.
-Étape 2 — Créer Pixel Map Assets v1
+
+Étape 2 — Créer Pixel Map Assets v1 OK
 Ajouter :
 - docs/pixel-map-assets-v1.schema.json
 - docs/PIXEL_MAP_ASSETS_V1.md
@@ -79,6 +81,7 @@ Le validateur devra notamment détecter :
 - les ancres hors de [0, 1] ;
 - les références complètes ambiguës ;
 - les formats et versions inconnus.
+
 Étape 3 — Faire exporter le catalogue par l’éditeur de jeu
 L’éditeur de jeu devient idéalement la source d’autorité.
 Son exporteur doit produire :
@@ -104,7 +107,8 @@ Le fichier de correspondance interne pourrait ressembler à ceci :
   }
 }
 Ce fichier peut rester dans le projet du jeu et ne pas être distribué à PixelMapEditor.
-Étape 4 — Remplacer le catalogue statique de PixelMapEditor
+
+Étape 4 — Remplacer le catalogue statique de PixelMapEditor OK
 Actuellement, la bibliothèque est codée dans [`src/assets.js`](C:\\Users\\cf\\source\\repos\\PixelMapEditor\\src\\assets.js), et l’interface utilise directement ASSETS et drawSprite dans [`app.js`](C:\\Users\\cf\\source\\repos\\PixelMapEditor\\app.js).
 Il faut introduire une abstraction, par exemple :
 class AssetRegistry {
@@ -135,6 +139,7 @@ Ensuite :
 - project-adapter.js exporte cette même référence ;
 - les assets intégrés actuels deviennent simplement une bibliothèque builtin.
 Cela évite d’avoir deux systèmes parallèles.
+
 Étape 5 — Généraliser le rendu
 Le renderer actuel appelle directement drawSprite() dans [`src/map-renderer.js`](C:\\Users\\cf\\source\\repos\\PixelMapEditor\\src\\map-renderer.js). Pour des assets externes, il faudra un chargeur asynchrone :
 const image = await assetLoader.load(asset.resolvedSource);
@@ -147,6 +152,7 @@ L’ancre intervient dans le calcul de dessin :
 drawX = position.x - width * anchor.x;
 drawY = position.y - height * anchor.y;
 C’est également ici qu’il faudra décider si position désigne l’ancre de l’objet — choix que je recommande — ou son centre.
+
 Étape 6 — Choisir le mode d’import dans le navigateur
 C’est le principal piège technique. Une application web ne peut pas librement ouvrir les images voisines d’un fichier JSON sélectionné par l’utilisateur.
 Trois solutions sont possibles :
@@ -164,6 +170,7 @@ office.pmap-assets.zip
     ├── desk.png
     └── chair.png
 À l’import, PixelMapEditor crée des URL blob: pour l’affichage. Il ne doit toutefois jamais les enregistrer dans la carte, car elles ne survivent pas à la session.
+
 Étape 7 — Adapter Pixel Map sans forcément créer tout de suite une v2
 Deux stratégies sont possibles.
 Variante A — Compatible avec Pixel Map v1

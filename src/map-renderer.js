@@ -1,16 +1,71 @@
 import { hasCell, objectPosition, polygonSelfIntersects } from './map-state.js';
+import { ASSET_IMAGE_ERROR, ASSET_IMAGE_LOADING, ASSET_IMAGE_READY, AssetImageLoader } from './asset-image-loader.js';
+
+export function assetDrawBox(asset, x, y, scale = 1) {
+  const width = asset.width * scale;
+  const height = asset.height * scale;
+  return { x: x - width * asset.anchor.x, y: y - height * asset.anchor.y, width, height };
+}
 
 export class MapRenderer {
-  constructor(canvas, state, assetRegistry = null) {
+  constructor(canvas, state, assetRegistry = null, assetImageLoader = null) {
     this.canvas = canvas;
     this.context = canvas.getContext('2d');
     this.state = state;
     this.assetRegistry = assetRegistry;
+    this.assetImageLoader = assetImageLoader || new AssetImageLoader();
+    this.assetImageLoader.subscribe(() => this.draw());
     this.preview = null;
   }
 
   setPreview(preview) { this.preview = preview; this.draw(); }
   clearPreview() { this.preview = null; }
+
+  drawAsset(context, resourceRef, x, y, { scale = 1, rotation = 0, placeholderSize = 32 } = {}) {
+    if (this.assetRegistry?.draw(context, resourceRef, x, y, scale, rotation)) return ASSET_IMAGE_READY;
+    const asset = this.assetRegistry?.get(resourceRef);
+    if (!asset) {
+      this.drawAssetPlaceholder(context, resourceRef, x, y, 'missing', placeholderSize, placeholderSize);
+      return 'missing';
+    }
+
+    const record = this.assetImageLoader.request(asset.resolvedSource);
+    if (record?.status === ASSET_IMAGE_READY) {
+      const box = assetDrawBox(asset, 0, 0, scale);
+      context.save();
+      context.translate(x, y);
+      context.rotate(rotation * Math.PI / 2);
+      context.imageSmoothingEnabled = false;
+      context.drawImage(record.image, box.x, box.y, box.width, box.height);
+      context.restore();
+      return ASSET_IMAGE_READY;
+    }
+
+    const box = assetDrawBox(asset, x, y, scale);
+    const status = record?.status === ASSET_IMAGE_ERROR ? ASSET_IMAGE_ERROR : ASSET_IMAGE_LOADING;
+    this.drawAssetPlaceholder(context, resourceRef, x, y, status, box.width, box.height);
+    return status;
+  }
+
+  drawAssetPlaceholder(context, resourceRef, x, y, status, width, height) {
+    const styles = {
+      missing: { fill: '#555d66', stroke: '#c9d0d7', label: 'Asset manquant' },
+      [ASSET_IMAGE_LOADING]: { fill: '#8a6826', stroke: '#ffd477', label: 'Chargement…' },
+      [ASSET_IMAGE_ERROR]: { fill: '#8b3030', stroke: '#ff9b9b', label: 'Image invalide' },
+    };
+    const style = styles[status] || styles.missing;
+    const boxWidth = Math.max(28, Math.min(width || 32, 160));
+    const boxHeight = Math.max(24, Math.min(height || 32, 120));
+    context.save();
+    context.fillStyle = style.fill; context.strokeStyle = style.stroke; context.lineWidth = 2;
+    context.fillRect(x - boxWidth / 2, y - boxHeight / 2, boxWidth, boxHeight);
+    context.strokeRect(x - boxWidth / 2, y - boxHeight / 2, boxWidth, boxHeight);
+    context.fillStyle = '#fff'; context.textAlign = 'center'; context.textBaseline = 'middle';
+    context.font = '9px sans-serif';
+    context.fillText(style.label, x, y - 5, boxWidth - 4);
+    context.fillText(resourceRef, x, y + 7, boxWidth - 4);
+    context.restore();
+  }
 
   draw({ editorOverlays = true } = {}) {
     const { context, canvas, state } = this;
@@ -144,9 +199,9 @@ export class MapRenderer {
     const scale = 0.58 * Math.min(cellWidth, cellHeight) / 32;
     this.state.objects.forEach((object) => {
       const { x: centerX, y: centerY } = objectPosition(this.state, object);
-      if (object.assetRef && this.assetRegistry?.draw(this.context, object.assetRef, centerX, centerY, scale, object.rotation)) {
-        // Le registre choisit le renderer correspondant à la bibliothèque.
-      }
+      if (object.assetRef) this.drawAsset(this.context, object.assetRef, centerX, centerY, {
+        scale, rotation: object.rotation, placeholderSize: Math.min(cellWidth, cellHeight),
+      });
       else if (editorOverlays) {
         this.context.fillStyle = '#7248a8'; this.context.strokeStyle = '#fff'; this.context.lineWidth = 2;
         this.context.beginPath(); this.context.arc(centerX, centerY, Math.max(5, Math.min(cellWidth, cellHeight) * 0.24), 0, Math.PI * 2); this.context.fill(); this.context.stroke();

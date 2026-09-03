@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "python -m http.server 8000",
-    "check": "node --check app.js && node --check src/validation-report.js && node --check src/unsaved-changes.js && node --check src/geometry.js && node --check src/map-state.js && node --check src/assets.js && node --check src/asset-reference.js && node --check src/asset-registry.js && node --check src/portable-assets.js && node --check src/pixel-map-assets-format.js && node --check src/map-renderer.js && node --check src/tools.js && node --check src/export.js && node --check src/pixel-map-format.js && node --check src/project-adapter.js",
-    "test": "node --test tests/asset-reference.test.js tests/asset-registry.test.js tests/pixel-map-assets-format.test.js tests/pixel-map-format.test.js tests/unsaved-changes.test.js tests/validation-report.test.js",
+    "check": "node --check app.js && node --check src/validation-report.js && node --check src/unsaved-changes.js && node --check src/geometry.js && node --check src/map-state.js && node --check src/assets.js && node --check src/asset-reference.js && node --check src/asset-registry.js && node --check src/asset-image-loader.js && node --check src/portable-assets.js && node --check src/pixel-map-assets-format.js && node --check src/map-renderer.js && node --check src/tools.js && node --check src/export.js && node --check src/pixel-map-format.js && node --check src/project-adapter.js",
+    "test": "node --test tests/asset-reference.test.js tests/asset-registry.test.js tests/asset-image-loader.test.js tests/map-renderer-assets.test.js tests/pixel-map-assets-format.test.js tests/pixel-map-format.test.js tests/unsaved-changes.test.js tests/validation-report.test.js",
     "test:browser": "playwright test",
     "test:all": "npm test && npm run test:browser"
   },
