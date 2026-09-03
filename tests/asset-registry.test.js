@@ -21,10 +21,19 @@ test('normalise une bibliothèque et résout ses sources relativement au catalog
   assert.deepEqual(registry.get('office:desk.standard'), {
     ref: 'office:desk.standard', libraryId: 'office', id: 'desk.standard', name: 'Bureau standard',
     type: 'image', source: './previews/desk.png', resolvedSource: 'https://example.test/assets/previews/desk.png',
+    portableSource: 'https://example.test/assets/previews/desk.png',
     width: 64, height: 48, anchor: { x: 0.5, y: 1 }, category: 'furniture',
     tags: ['desk', 'work'], properties: { fixture: true },
   });
   assert.equal(registry.resolveSource('office:desk.standard'), 'https://example.test/assets/previews/desk.png');
+});
+
+test('libère les ressources temporaires au retrait d’une bibliothèque', () => {
+  let disposed = false;
+  const registry = new AssetRegistry();
+  registry.addLibrary(library(), { dispose: () => { disposed = true; } });
+  registry.removeLibrary('office');
+  assert.equal(disposed, true);
 });
 
 test('recherche par nom, identifiant, tag et catégorie', () => {

@@ -54,7 +54,7 @@ export function stateToDocument(state) {
   replaceById(document.resources, floorResource.id, mergeResource(document.resources.find((item) => item.id === floorResource.id), floorResource));
   [...usedAssets].map((ref) => assetRegistry.get(ref)).filter(Boolean).forEach((item) => {
     const generated = {
-      id: item.ref, type: 'image', source: item.resolvedSource, width: item.width, height: item.height,
+      id: item.ref, type: 'image', source: item.portableSource, width: item.width, height: item.height,
       properties: { library: item.libraryId, assetId: item.id, anchor: clone(item.anchor), ...clone(item.properties) },
     };
     replaceById(document.resources, generated.id, mergeResource(document.resources.find((resource) => resource.id === generated.id), generated));

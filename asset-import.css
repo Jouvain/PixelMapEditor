@@ -1,0 +1,57 @@
+.asset-import {
+  border: 1px solid var(--line);
+  background: #f5f2ea;
+  padding: 9px;
+  margin-bottom: 12px;
+}
+
+.asset-import label {
+  display: block;
+  font-size: 9px;
+  color: #686e6d;
+}
+
+.asset-import input[type="url"] {
+  width: 100%;
+  margin: 5px 0;
+  padding: 6px;
+  border: 1px solid #ccc;
+}
+
+.asset-import > button {
+  width: 100%;
+  padding: 6px;
+}
+
+.asset-import-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.asset-import-buttons button {
+  padding: 6px 2px;
+  font-size: 9px;
+}
+
+.asset-library-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 9px;
+}
+
+.asset-library-row span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.asset-library-row button {
+  border: 0;
+  background: none;
+  color: #a7431d;
+  padding: 2px;
+}

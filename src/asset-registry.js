@@ -6,13 +6,19 @@ function resolveAssetSource(source, baseUrl) {
   return new URL(source, baseUrl).href;
 }
 
+function portableAssetSource(source, baseUrl) {
+  if (!baseUrl || source.startsWith('data:image/') || /^https:\/\//i.test(source)) return source;
+  const resolved = new URL(source, baseUrl);
+  return resolved.protocol === 'https:' ? resolved.href : source;
+}
+
 export class AssetRegistry {
   constructor() {
     this.libraries = new Map();
     this.assets = new Map();
   }
 
-  addLibrary(library, { baseUrl = null, draw = null } = {}) {
+  addLibrary(library, { baseUrl = null, draw = null, sourceResolver = null, dispose = null } = {}) {
     const validation = validatePixelMapAssets(library);
     if (!validation.valid) {
       const error = new Error(`Catalogue ${library?.id || 'inconnu'} invalide.`);
@@ -30,7 +36,8 @@ export class AssetRegistry {
         name: resource.name,
         type: resource.type,
         source: resource.source,
-        resolvedSource: resolveAssetSource(resource.source, baseUrl),
+        resolvedSource: sourceResolver ? sourceResolver(resource.source, resource) : resolveAssetSource(resource.source, baseUrl),
+        portableSource: portableAssetSource(resource.source, baseUrl),
         width: resource.size.width,
         height: resource.size.height,
         anchor: Object.freeze({ ...resource.anchor }),
@@ -45,6 +52,7 @@ export class AssetRegistry {
       name: library.name,
       baseUrl,
       draw,
+      dispose,
       catalog: structuredClone(library),
       assets: Object.freeze(normalized),
     });
@@ -58,6 +66,7 @@ export class AssetRegistry {
     if (!library) return false;
     library.assets.forEach((asset) => this.assets.delete(asset.ref));
     this.libraries.delete(libraryId);
+    library.dispose?.();
     return true;
   }
 

@@ -1,4 +1,7 @@
-import { assetRegistry } from './src/assets.js';
+import { assetRegistry, DEFAULT_ASSET_REF } from './src/assets.js';
+import {
+  importAssetCatalogDirectory, importAssetCatalogFile, importAssetCatalogFromUrl, importAssetCatalogPackage,
+} from './src/asset-catalog-import.js';
 import {
   addPolygonVertex, analyzeCollisionConsistency, analyzeGridResize, changeObjectOrder, copyBlueprintSelection, copyCollisionFromBlueprint, createHistory, createMapState,
   deleteBlueprintSelection, deletePolygonVertex, deleteSelectedDoor, deleteSelectedEntity, duplicateBlueprintSelection,
@@ -205,6 +208,37 @@ function renderAssetLibrary() {
     });
 }
 
+function renderLoadedAssetLibraries() {
+  const container = $('#loadedAssetLibraries');
+  container.replaceChildren();
+  [...assetRegistry.libraries.values()].filter((library) => library.id !== 'builtin').forEach((library) => {
+    const row = document.createElement('div'); row.className = 'asset-library-row';
+    const label = document.createElement('span'); label.textContent = `${library.name} (${library.assets.length})`;
+    const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Retirer';
+    remove.addEventListener('click', () => {
+      const sources = library.assets.map((asset) => asset.resolvedSource);
+      assetRegistry.removeLibrary(library.id);
+      sources.forEach((source) => renderer.assetImageLoader.clear(source));
+      if (state.selectedAsset?.startsWith(`${library.id}:`)) state.selectedAsset = DEFAULT_ASSET_REF;
+      renderLoadedAssetLibraries(); renderAssetLibrary(); renderer.draw();
+      notify(`Bibliothèque ${library.name} retirée ; les objets placés sont conservés.`);
+    });
+    row.append(label, remove); container.append(row);
+  });
+}
+
+async function handleAssetImport(operation) {
+  try {
+    const result = await operation();
+    renderLoadedAssetLibraries(); renderAssetLibrary(); renderer.draw();
+    notify(`Bibliothèque ${result.library.name} chargée (${result.library.assets.length} assets).`);
+  } catch (error) {
+    if (error.name === 'AbortError') return;
+    if (error.issues) showValidationReport({ valid: false, issues: error.issues }, { title: 'Import Pixel Map Assets' });
+    notify(error.message || 'Impossible d’importer le catalogue.');
+  }
+}
+
 const toolController = new ToolController({
   canvas, state, renderer, history,
   onChange: () => { markDirty(); updateStats(); },
@@ -342,6 +376,22 @@ $$('.cats button').forEach((button) => button.addEventListener('click', () => {
 }));
 
 $('#search').addEventListener('input', renderAssetLibrary);
+$('#importAssetUrl').addEventListener('click', () => handleAssetImport(() => importAssetCatalogFromUrl($('#assetCatalogUrl').value.trim(), assetRegistry)));
+$('#importAssetFile').addEventListener('click', () => $('#assetCatalogFile').click());
+$('#assetCatalogFile').addEventListener('change', async (event) => {
+  const [file] = event.target.files;
+  if (file) await handleAssetImport(() => importAssetCatalogFile(file, assetRegistry));
+  event.target.value = '';
+});
+$('#importAssetPackage').addEventListener('click', () => $('#assetPackageFile').click());
+$('#assetPackageFile').addEventListener('change', async (event) => {
+  const [file] = event.target.files;
+  if (file) await handleAssetImport(() => importAssetCatalogPackage(file, assetRegistry));
+  event.target.value = '';
+});
+const directoryImportButton = $('#importAssetDirectory');
+directoryImportButton.hidden = typeof globalThis.showDirectoryPicker !== 'function';
+directoryImportButton.addEventListener('click', () => handleAssetImport(() => importAssetCatalogDirectory(assetRegistry)));
 $('#width').addEventListener('input', (event) => {
   state.wallWidth = Number(event.target.value);
   $('#widthOut').textContent = `${state.wallWidth} px`;
@@ -476,6 +526,7 @@ $('#name').value = state.projectName;
 $('#width').value = state.wallWidth;
 $('#grid').checked = state.showGrid;
 renderAssetLibrary();
+renderLoadedAssetLibraries();
 setZoom(0);
 refresh();
 renderInspector();

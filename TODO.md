@@ -140,7 +140,7 @@ Ensuite :
 - les assets intégrés actuels deviennent simplement une bibliothèque builtin.
 Cela évite d’avoir deux systèmes parallèles.
 
-Étape 5 — Généraliser le rendu
+Étape 5 — Généraliser le rendu OK
 Le renderer actuel appelle directement drawSprite() dans [`src/map-renderer.js`](C:\\Users\\cf\\source\\repos\\PixelMapEditor\\src\\map-renderer.js). Pour des assets externes, il faudra un chargeur asynchrone :
 const image = await assetLoader.load(asset.resolvedSource);
 Le renderer devra gérer trois états :

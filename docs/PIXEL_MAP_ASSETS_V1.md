@@ -49,6 +49,26 @@ Un `resource.id` contenant `:` est invalide et ambigu. Les règles complètes de
 
 Un chemin relatif est toujours résolu depuis le répertoire du fichier `.pmap-assets.json`. Il ne dépend ni de la carte qui consomme le catalogue, ni du répertoire courant du moteur. Les URI temporaires `blob:`, les chemins absolus et les URI propres à un moteur ne sont pas portables et sont refusés.
 
+## Import dans PixelMapEditor
+
+L’éditeur accepte trois formes d’import :
+
+- une URL HTTPS vers un catalogue, dont les sources relatives sont résolues depuis cette URL ;
+- un fichier `.pmap-assets.json` autonome, si toutes ses images utilisent `data:image/...` ou HTTPS ;
+- un paquet `.pmap-assets.zip` contenant exactement un catalogue et ses images.
+
+```text
+office.pmap-assets.zip
+├── catalog.json
+└── images/
+    ├── desk.png
+    └── chair.png
+```
+
+Dans les navigateurs compatibles, un dossier présentant la même arborescence peut aussi être ouvert directement. Les paquets et dossiers sont limités à 500 fichiers et 100 Mio décompressés ; un ZIP ne peut pas dépasser 25 Mio.
+
+PixelMapEditor crée des URL `blob:` temporaires pour afficher les images d’un paquet ou d’un dossier. Elles sont révoquées lorsque la bibliothèque est retirée et ne sont jamais sérialisées : une carte exportée conserve la source portable du catalogue.
+
 ## Dimensions et ancre
 
 `size` contient les dimensions intrinsèques de présentation en pixels. `width` et `height` sont des entiers strictement positifs.

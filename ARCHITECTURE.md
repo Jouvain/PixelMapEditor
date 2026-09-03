@@ -62,6 +62,8 @@ Les zones peuvent être rectangulaires ou polygonales. Un polygone est construit
 
 ## Ressources graphiques portables
 
+`src/asset-catalog-import.js` charge les catalogues Pixel Map Assets depuis HTTPS, un JSON autonome, un paquet ZIP ou, si le navigateur le permet, un dossier. Il sépare la source portable de l’URL `blob:` de session et libère cette dernière au retrait de la bibliothèque.
+
 L’interface, le renderer et l’adaptateur partagent une instance unique d’`AssetRegistry`. L’état stocke `assetRef` sous forme qualifiée, par exemple `builtin:desk`, et non un identifiant dépendant du catalogue interne. Le registre normalise les catalogues Pixel Map Assets, recherche les ressources et résout leurs sources. Le renderer propre à chaque bibliothèque reste une dépendance d’exécution et ne fait pas partie du catalogue portable.
 
 Les images sans renderer spécialisé passent par `AssetImageLoader`. Une ressource est successivement `loading`, `ready` ou `error`; chaque changement redéclenche le dessin de la carte et de la palette. La position logique d’un objet désigne l’ancre normalisée de son asset. Une référence absente du registre et une image en erreur restent visibles sous forme de placeholders étiquetés, afin que l’objet demeure sélectionnable et ne soit jamais perdu silencieusement.
